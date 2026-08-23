@@ -16,6 +16,10 @@
 # next.js
 /.next/
 /out/
+tsconfig.tsbuildinfo
+
+# IDE
+.cursor/
 
 # production
 /build
@@ -30,12 +34,17 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env
+.env*.local
+!.env.example
+!.env.railway.example
 
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# criativos e logos enviados pelo lojista (demo local; produção usa Storage)
+/public/uploads/criativos/*
+!/public/uploads/criativos/.gitkeep
+/public/uploads/logo/*
+!/public/uploads/logo/.gitkeep

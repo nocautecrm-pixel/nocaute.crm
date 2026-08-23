@@ -1,0 +1,35 @@
+{
+  "name": "cardapio_semana",
+  "language": "pt_BR",
+  "category": "MARKETING",
+  "description": "Cardápio da semana — escalar após Quality Rating High.",
+  "creation": {
+    "method": "POST",
+    "path": "/{WABA_ID}/message_templates",
+    "body": {
+      "name": "cardapio_semana",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi, {{1}}! O cardápio da semana acabou de sair. Dá uma olhada nas novidades e peça quando quiser.",
+          "example": {
+            "body_text": [["Ana"]]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "Pedir Agora",
+              "url": "https://{{1}}",
+              "example": ["menu.sua-loja.com.br/semana"]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "retorno_15_dias",
+  "language": "pt_BR",
+  "category": "MARKETING",
+  "description": "Reativação warm base — cliente com opt-in comprovado, sem compra há 15+ dias.",
+  "creation": {
+    "method": "POST",
+    "path": "/{WABA_ID}/message_templates",
+    "body": {
+      "name": "retorno_15_dias",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Olá, {{1}}! Faz um tempinho que não te vemos por aqui. Preparamos uma oferta especial pra você voltar. Toque no botão e confira o cardápio.",
+          "example": {
+            "body_text": [["Maria"]]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "Ver Cardápio",
+              "url": "https://{{1}}",
+              "example": ["menu.sua-loja.com.br/retorno"]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "send_example": {
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": "5511999998888",
+    "type": "template",
+    "template": {
+      "name": "retorno_15_dias",
+      "language": { "code": "pt_BR" },
+      "components": [
+        {
+          "type": "body",
+          "parameters": [{ "type": "text", "text": "Maria" }]
+        },
+        {
+          "type": "button",
+          "sub_type": "url",
+          "index": "0",
+          "parameters": [{ "type": "text", "text": "menu.sua-loja.com.br/retorno?cupom=LIMAO15-ABC" }]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "aniversario_cliente",
+  "language": "pt_BR",
+  "category": "MARKETING",
+  "description": "Aniversário — escalar após 7 dias com Quality Rating High.",
+  "creation": {
+    "method": "POST",
+    "path": "/{WABA_ID}/message_templates",
+    "body": {
+      "name": "aniversario_cliente",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Feliz aniversário, {{1}}! 🎂 A equipe preparou um mimo especial pra você. Toque no botão e resgate seu cupom.",
+          "example": {
+            "body_text": [["João"]]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "Resgatar Cupom",
+              "url": "https://{{1}}",
+              "example": ["menu.sua-loja.com.br/aniversario"]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

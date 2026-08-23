@@ -1,17 +1,36 @@
 {
-  "name": "mesa-fiel",
+  "name": "nocaute-crm",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack -p 3001",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start -p 3001",
+    "lint": "eslint",
+    "worker": "tsx src/workers/index.ts",
+    "infra:redis": "docker compose up -d",
+    "setup:env": "node scripts/setup-local-env.mjs",
+    "setup:secrets": "node scripts/generate-secrets.mjs",
+    "setup:check": "node --env-file=.env.local scripts/check-env.mjs",
+    "setup:migrations": "node scripts/list-migrations.mjs",
+    "setup:bootstrap-sql": "node scripts/combine-migrations.mjs",
+    "setup:db": "node --env-file=.env.local scripts/run-migrations.mjs",
+    "setup:user": "node --env-file=.env.local scripts/create-bootstrap-user.mjs",
+    "setup:store": "node --env-file=.env.local scripts/bootstrap-restaurant.mjs",
+    "setup:verify": "node --env-file=.env.local scripts/verify-supabase.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.3",
+    "bullmq": "^6.1.2",
+    "date-fns": "^4.4.0",
+    "ioredis": "^6.0.0",
+    "lucide-react": "^1.31.0",
     "next": "16.3.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "tsx": "^4.23.12",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -20,6 +39,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "pg": "^8.23.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
