@@ -1,3 +1,4 @@
+import { ProductLogo } from "@/components/brand/ProductLogo";
 import { BRAND } from "@/lib/brand";
 import { isProductionRuntime, missingLiveBackendEnv } from "@/lib/config";
 
@@ -8,7 +9,8 @@ export default function IndisponivelPage() {
   return (
     <main className="flex min-h-full items-center justify-center bg-[#F0F2F5] px-6 py-16">
       <section className="w-full max-w-lg rounded-2xl border border-[#E9EDEF] bg-white p-8 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+        <ProductLogo size="md" />
+        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
           {BRAND.productName}
         </p>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[#111B21]">

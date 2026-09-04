@@ -1,11 +1,10 @@
 import { BRAND } from "@/lib/brand";
 import { currentCalendarPeriod, DEFAULT_PLAN, remainingOf } from "@/lib/billing/plans";
-import { DEFAULT_BRAND_DNA } from "@/lib/chatbot/dna";
 import { getGraphVersion } from "@/lib/config";
 import {
   META_CONNECTED_LABEL,
   META_DISCONNECTED_LABEL,
-  RETURN_TEMPLATE,
+  OPTIN_TEMPLATE,
 } from "@/lib/whatsapp/constants";
 import { formatWhatsAppPhone } from "@/lib/whatsapp/display";
 import type { MetaHealthItem, StorePanel, WhatsAppConnection } from "@/types/store";
@@ -85,7 +84,7 @@ export function buildMetaHealth(input: {
       id: "templates",
       label: "Templates APPROVED",
       ok: input.connected,
-      detail: `Campanha só dispara se "${RETURN_TEMPLATE.name}" (e os outros em public/templates/) estiverem APPROVED nesta WABA. A ferramenta confere na hora de criar.`,
+      detail: `Campanha só dispara se "${OPTIN_TEMPLATE.name}" (Continuar / Não receber oferta) estiver APPROVED nesta WABA. JSON em public/templates/.`,
     },
     {
       id: "quota",
@@ -98,7 +97,7 @@ export function buildMetaHealth(input: {
       label: "Respostas dos clientes",
       ok: Boolean(input.webhookReceived),
       detail: input.webhookReceived
-        ? "A Meta já entregou evento neste webhook. Confirmar e cupom inbound estão chegando."
+        ? "A Meta já entregou evento neste webhook. Continuar / Não receber oferta e cupom inbound estão chegando."
         : input.connected
           ? `Ainda não chegou evento. No app da Meta cadastre ${webhookUrl} (WhatsApp → Configuration) e o mesmo WEBHOOK_VERIFY_TOKEN.`
           : "Ativa depois do login da Meta e do cadastro do webhook HTTPS.",
@@ -132,7 +131,6 @@ export const DEMO_STORE: StorePanel = {
     graphVersion: getGraphVersion(),
     ...emptyChannel(),
   },
-  chatbot: DEFAULT_BRAND_DNA,
   quota: {
     planSlug: DEFAULT_PLAN.slug,
     planName: DEFAULT_PLAN.name,

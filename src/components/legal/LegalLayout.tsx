@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProductLogo } from "@/components/brand/ProductLogo";
 import { BRAND } from "@/lib/brand";
 
 export function LegalLayout({
@@ -11,7 +12,8 @@ export function LegalLayout({
   return (
     <div className="min-h-full bg-[#F0F2F5] px-4 py-10">
       <article className="mx-auto max-w-2xl rounded-xl border border-[#E9EDEF] bg-white p-6 shadow-sm">
-        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#667781]">
+        <ProductLogo size="sm" />
+        <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#667781]">
           {BRAND.productName}
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#111B21]">{title}</h1>

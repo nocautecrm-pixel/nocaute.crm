@@ -16,7 +16,7 @@ export async function GET() {
     if (!admin) throw new Error("Supabase admin indisponível.");
 
     const [customers, campaigns, coupons] = await Promise.all([
-      admin.from("customers").select("name, phone, last_purchase_at, opt_in, opt_in_at, opt_in_source").eq("restaurant_id", restaurantId),
+      admin.from("customers").select("name, phone, last_purchase_at, order_count, opt_in, opt_in_at, opt_in_source").eq("restaurant_id", restaurantId),
       admin.from("campaigns").select("name, segment, status, created_at").eq("restaurant_id", restaurantId),
       admin.from("coupons").select("code, status, redeemed_at, redeemed_via").eq("restaurant_id", restaurantId),
     ]);

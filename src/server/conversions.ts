@@ -54,11 +54,22 @@ export async function redeemCoupon(
   if (!updated) return { ok: false as const, reason: "already_redeemed" as const };
 
   if (coupon.customer_id) {
-    await admin
+    const { data: customer } = await admin
       .from("customers")
-      .update({ last_purchase_at: now })
+      .select("order_count")
       .eq("id", coupon.customer_id)
-      .eq("restaurant_id", restaurantId);
+      .eq("restaurant_id", restaurantId)
+      .maybeSingle();
+    if (customer) {
+      await admin
+        .from("customers")
+        .update({
+          last_purchase_at: now,
+          order_count: (Number(customer.order_count) || 0) + 1,
+        })
+        .eq("id", coupon.customer_id)
+        .eq("restaurant_id", restaurantId);
+    }
   }
 
   return { ok: true as const, code };

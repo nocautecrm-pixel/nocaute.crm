@@ -1,6 +1,10 @@
 import {
   CONFIRM_BUTTON_TEXT,
   CONFIRM_OPTIN_PAYLOAD,
+  CONTINUE_BUTTON_TEXT,
+  CONTINUE_OFFER_PAYLOAD,
+  STOP_OFFERS_BUTTON_TEXT,
+  STOP_OFFERS_PAYLOAD,
 } from "@/lib/whatsapp/constants";
 
 export type MetaInboundMessage = {
@@ -42,17 +46,38 @@ export function getButtonClick(message: MetaInboundMessage) {
   return { payload, text, typed };
 }
 
-export function isConfirmOptInClick(message: MetaInboundMessage) {
-  const { payload, text, typed } = getButtonClick(message);
-  const candidates = [payload, text, typed];
+function matchesAny(candidates: string[], accepted: string[]) {
   return candidates.some((value) => {
     const upper = value.toUpperCase();
-    return (
-      upper === CONFIRM_OPTIN_PAYLOAD ||
-      upper === CONFIRM_BUTTON_TEXT.toUpperCase() ||
-      upper === "CONFIRMAR"
-    );
+    return accepted.some((item) => upper === item.toUpperCase());
   });
+}
+
+/** Cliente tocou Continuar (ou Confirmar no template legado). */
+export function isContinueOfferClick(message: MetaInboundMessage) {
+  const { payload, text, typed } = getButtonClick(message);
+  return matchesAny([payload, text, typed], [
+    CONTINUE_OFFER_PAYLOAD,
+    CONTINUE_BUTTON_TEXT,
+    CONFIRM_OPTIN_PAYLOAD,
+    CONFIRM_BUTTON_TEXT,
+  ]);
+}
+
+/** @deprecated use isContinueOfferClick */
+export function isConfirmOptInClick(message: MetaInboundMessage) {
+  return isContinueOfferClick(message);
+}
+
+/** Cliente tocou Não receber oferta — opt-out e silêncio. */
+export function isStopOffersClick(message: MetaInboundMessage) {
+  const { payload, text, typed } = getButtonClick(message);
+  return matchesAny([payload, text, typed], [
+    STOP_OFFERS_PAYLOAD,
+    STOP_OFFERS_BUTTON_TEXT,
+    "NAO RECEBER OFERTA",
+    "NÃO RECEBER OFERTA",
+  ]);
 }
 
 export function parseWebhookPayload(rawBody: string): MetaWebhookPayload {

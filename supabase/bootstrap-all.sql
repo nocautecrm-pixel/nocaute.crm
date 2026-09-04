@@ -613,3 +613,62 @@ alter table public.restaurants
   add column if not exists menu_url text,
   add column if not exists address text,
   add column if not exists hours_text text;
+
+
+-- ========== 0015_audiences.sql ==========
+create table if not exists public.audiences (
+  id uuid primary key default gen_random_uuid(),
+  restaurant_id uuid not null references public.restaurants (id) on delete cascade,
+  slug text not null,
+  name text not null,
+  min_days integer not null check (min_days >= 0),
+  max_days integer not null check (max_days >= min_days and max_days <= 120),
+  is_default boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (restaurant_id, slug)
+);
+
+create index if not exists audiences_restaurant_idx on public.audiences (restaurant_id);
+
+alter table public.campaigns
+  add column if not exists audience_id uuid references public.audiences (id) on delete set null;
+
+alter table public.audiences enable row level security;
+
+drop policy if exists audiences_tenant on public.audiences;
+create policy audiences_tenant on public.audiences
+  for all using (restaurant_id = public.current_restaurant_id())
+  with check (restaurant_id = public.current_restaurant_id());
+
+
+-- ========== 0016_customer_order_count.sql ==========
+alter table public.customers
+  add column if not exists order_count integer not null default 0;
+
+alter table public.customers
+  drop constraint if exists customers_order_count_check;
+
+alter table public.customers
+  add constraint customers_order_count_check
+  check (order_count >= 0);
+
+comment on column public.customers.order_count is
+  'Quantidade de pedidos conhecida da loja (planilha ou visita registrada).';
+
+
+-- ========== 0017_customers_imported_at.sql ==========
+alter table public.restaurants
+  add column if not exists customers_imported_at timestamptz;
+
+comment on column public.restaurants.customers_imported_at is
+  'Última vez que a loja importou a planilha de clientes. O aviso de lista velha usa só essa data.';
+
+-- Lojas que já têm base não acordam com alarme falso: o ciclo de 30 dias começa agora.
+update public.restaurants as restaurant
+set customers_imported_at = now()
+where restaurant.customers_imported_at is null
+  and exists (
+    select 1
+    from public.customers as customer
+    where customer.restaurant_id = restaurant.id
+  );

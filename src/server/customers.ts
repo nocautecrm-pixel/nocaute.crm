@@ -13,11 +13,13 @@ import {
   matchesSegment,
   segmentForDays,
 } from "@/lib/segments/recency";
+import { matchesAudienceDays } from "@/lib/audiences/defaults";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { digitsOnly, normalizeToE164 } from "@/lib/whatsapp/phone";
 import type { Customer, CustomerRow, RecencySegment } from "@/types/database";
 
 const DEMO_CUSTOMERS_COOKIE = "nocaute_customers";
+const DEMO_IMPORT_AT_COOKIE = "nocaute_list_imported_at";
 const DEMO_IMPORT_CAP = 25;
 
 type DemoCustomerState = {
@@ -31,6 +33,7 @@ type CustomerInput = {
   phone: string;
   segment?: RecencySegment;
   lastVisitAt?: string;
+  orderCount?: number;
   optIn: boolean;
   optInSource?: string;
   optInProof?: string;
@@ -84,6 +87,61 @@ async function writeDemoState(state: DemoCustomerState) {
   });
 }
 
+export async function getCustomersImportedAt(restaurantId: string): Promise<string | null> {
+  if (isDemoMode()) {
+    const jar = await cookies();
+    return jar.get(DEMO_IMPORT_AT_COOKIE)?.value || null;
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) throw new BackendUnavailableError();
+  requireLiveBackend();
+  if (!restaurantId || restaurantId === DEMO_RESTAURANT_ID) {
+    throw new Error("Loja não identificada.");
+  }
+
+  const { data, error } = await admin
+    .from("restaurants")
+    .select("customers_imported_at")
+    .eq("id", restaurantId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.customers_imported_at ?? null;
+}
+
+async function markCustomersImported(restaurantId: string) {
+  const at = new Date().toISOString();
+  if (isDemoMode()) {
+    const jar = await cookies();
+    jar.set(DEMO_IMPORT_AT_COOKIE, at, { path: "/", sameSite: "lax" });
+    return;
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) throw new Error("Supabase admin indisponível.");
+  const { error } = await admin
+    .from("restaurants")
+    .update({ customers_imported_at: at })
+    .eq("id", restaurantId);
+  if (error) throw error;
+}
+
+async function clearCustomersImportedAt(restaurantId: string) {
+  if (isDemoMode()) {
+    const jar = await cookies();
+    jar.set(DEMO_IMPORT_AT_COOKIE, "", { path: "/", sameSite: "lax", maxAge: 0 });
+    return;
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) throw new Error("Supabase admin indisponível.");
+  const { error } = await admin
+    .from("restaurants")
+    .update({ customers_imported_at: null })
+    .eq("id", restaurantId);
+  if (error) throw error;
+}
+
 function assembleDemoCustomers(state: DemoCustomerState): Customer[] {
   const seen = new Set<string>();
   const merged: Customer[] = [];
@@ -99,7 +157,7 @@ function assembleDemoCustomers(state: DemoCustomerState): Customer[] {
     const key = digitsOnly(customer.phone);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    merged.push(customer);
+    merged.push({ ...customer, orderCount: customer.orderCount ?? 0 });
   }
   return merged;
 }
@@ -117,12 +175,16 @@ function requirePhone(raw: string) {
   return phone;
 }
 
+const CUSTOMER_SELECT =
+  "id, restaurant_id, name, phone, last_purchase_at, order_count, opt_in, opt_in_at, opt_in_source, opt_in_proof, created_at";
+
 function mapRow(row: {
   id: string;
   restaurant_id: string;
   name: string;
   phone: string;
   last_purchase_at: string | null;
+  order_count?: number | null;
   opt_in: boolean;
   opt_in_at: string | null;
   opt_in_source: string | null;
@@ -135,11 +197,28 @@ function mapRow(row: {
     name: row.name,
     phone: row.phone,
     lastPurchaseAt: row.last_purchase_at,
+    orderCount: Math.max(0, Number(row.order_count) || 0),
     optIn: row.opt_in,
     optInAt: row.opt_in_at,
     optInSource: row.opt_in_source,
     optInProof: row.opt_in_proof,
     createdAt: row.created_at,
+  };
+}
+
+export function toPublicCustomer(row: Customer): Customer {
+  return {
+    id: row.id,
+    restaurantId: row.restaurantId,
+    name: row.name,
+    phone: row.phone,
+    lastPurchaseAt: row.lastPurchaseAt,
+    orderCount: row.orderCount ?? 0,
+    optIn: row.optIn,
+    optInAt: row.optInAt,
+    optInSource: row.optInSource,
+    optInProof: row.optInProof,
+    createdAt: row.createdAt,
   };
 }
 
@@ -162,9 +241,7 @@ export async function listCustomers(segment?: RecencySegment, restaurantId?: str
 
   const { data, error } = await admin
     .from("customers")
-    .select(
-      "id, restaurant_id, name, phone, last_purchase_at, opt_in, opt_in_at, opt_in_source, opt_in_proof, created_at",
-    )
+    .select(CUSTOMER_SELECT)
     .eq("restaurant_id", restaurantId)
     .order("last_purchase_at", { ascending: true, nullsFirst: true });
   if (error) throw error;
@@ -176,30 +253,100 @@ export async function listCustomers(segment?: RecencySegment, restaurantId?: str
 
 export async function importCustomers(restaurantId: string, rows: ParsedCustomerRow[]) {
   let imported = 0;
-  let duplicates = 0;
+  let updated = 0;
   let invalid = 0;
+
+  const incoming = rows.filter((row) => Boolean(row.phone));
 
   if (isDemoMode()) {
     const state = await readDemoState();
-    const existing = new Set(assembleDemoCustomers(state).map((customer) => digitsOnly(customer.phone)));
-    const next = { ...state, extras: [...state.extras] };
-    for (const row of rows) {
+    const current = assembleDemoCustomers(state);
+    const extras = [...state.extras];
+    const overrides = { ...state.overrides };
+    const known = new Map(current.map((customer) => [digitsOnly(customer.phone), customer]));
+
+    for (const row of incoming) {
       const key = digitsOnly(row.phone);
-      if (existing.has(key)) {
-        duplicates += 1;
+      const existing = known.get(key);
+      if (!existing) {
+        if (extras.length >= DEMO_IMPORT_CAP) {
+          invalid += 1;
+          continue;
+        }
+        const created: Customer = {
+          id: `imp-${key}`,
+          restaurantId,
+          name: row.name,
+          phone: row.phone,
+          lastPurchaseAt: row.lastPurchaseAt,
+          orderCount: row.orderCount ?? 0,
+          optIn: row.optIn,
+          optInAt: row.optInAt,
+          optInSource: row.optInSource,
+          optInProof: row.optInProof,
+          createdAt: new Date().toISOString(),
+        };
+        extras.unshift(created);
+        known.set(key, created);
+        imported += 1;
         continue;
       }
-      if (next.extras.length >= DEMO_IMPORT_CAP) {
+      const merged = mergeImportedCustomer(existing, row);
+      if (sameCustomer(existing, merged)) continue;
+      known.set(key, merged);
+      if (extras.some((customer) => customer.id === existing.id)) {
+        const index = extras.findIndex((customer) => customer.id === existing.id);
+        extras[index] = merged;
+      } else {
+        overrides[existing.id] = merged;
+      }
+      updated += 1;
+    }
+
+    await writeDemoState({ ...state, extras, overrides });
+    if (incoming.length > 0) await markCustomersImported(restaurantId);
+    return { imported, updated, invalid };
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) throw new Error("Supabase admin indisponível.");
+
+  const { data: current, error: currentError } = await admin
+    .from("customers")
+    .select(CUSTOMER_SELECT)
+    .eq("restaurant_id", restaurantId);
+  if (currentError) throw currentError;
+
+  const known = new Map(
+    (current ?? []).map((row) => [digitsOnly(row.phone), mapRow(row)]),
+  );
+
+  for (const row of incoming) {
+    const key = digitsOnly(row.phone);
+    const existing = known.get(key);
+    if (!existing) {
+      const { error } = await admin.from("customers").insert({
+        restaurant_id: restaurantId,
+        name: row.name,
+        phone: row.phone,
+        last_purchase_at: row.lastPurchaseAt,
+        order_count: row.orderCount ?? 0,
+        opt_in: row.optIn,
+        opt_in_at: row.optInAt,
+        opt_in_source: row.optInSource,
+        opt_in_proof: row.optInProof,
+      });
+      if (error) {
         invalid += 1;
         continue;
       }
-      existing.add(key);
-      next.extras.unshift({
-        id: `imp-${key}`,
+      known.set(key, {
+        id: `tmp-${key}`,
         restaurantId,
         name: row.name,
         phone: row.phone,
         lastPurchaseAt: row.lastPurchaseAt,
+        orderCount: row.orderCount ?? 0,
         optIn: row.optIn,
         optInAt: row.optInAt,
         optInSource: row.optInSource,
@@ -207,42 +354,74 @@ export async function importCustomers(restaurantId: string, rows: ParsedCustomer
         createdAt: new Date().toISOString(),
       });
       imported += 1;
-    }
-    await writeDemoState(next);
-    return { imported, duplicates, invalid };
-  }
-
-  const admin = createSupabaseAdminClient();
-  if (!admin) throw new Error("Supabase admin indisponível.");
-
-  const { data: current } = await admin.from("customers").select("phone").eq("restaurant_id", restaurantId);
-  const existing = new Set((current ?? []).map((row) => digitsOnly(row.phone)));
-
-  for (const row of rows) {
-    const key = digitsOnly(row.phone);
-    if (existing.has(key)) {
-      duplicates += 1;
       continue;
     }
-    const { error } = await admin.from("customers").insert({
-      restaurant_id: restaurantId,
-      name: row.name,
-      phone: row.phone,
-      last_purchase_at: row.lastPurchaseAt,
-      opt_in: row.optIn,
-      opt_in_at: row.optInAt,
-      opt_in_source: row.optInSource,
-      opt_in_proof: row.optInProof,
-    });
+
+    const merged = mergeImportedCustomer(existing, row);
+    if (sameCustomer(existing, merged)) continue;
+    const { error } = await admin
+      .from("customers")
+      .update({
+        name: merged.name,
+        last_purchase_at: merged.lastPurchaseAt,
+        order_count: merged.orderCount,
+        opt_in: merged.optIn,
+        opt_in_at: merged.optInAt,
+        opt_in_source: merged.optInSource,
+        opt_in_proof: merged.optInProof,
+      })
+      .eq("id", existing.id)
+      .eq("restaurant_id", restaurantId);
     if (error) {
       invalid += 1;
       continue;
     }
-    existing.add(key);
-    imported += 1;
+    known.set(key, merged);
+    updated += 1;
   }
 
-  return { imported, duplicates, invalid };
+  if (incoming.length > 0) await markCustomersImported(restaurantId);
+  return { imported, updated, invalid };
+}
+
+function sameCustomer(left: Customer, right: Customer) {
+  return (
+    left.name === right.name &&
+    left.lastPurchaseAt === right.lastPurchaseAt &&
+    left.orderCount === right.orderCount &&
+    left.optIn === right.optIn &&
+    left.optInAt === right.optInAt &&
+    left.optInSource === right.optInSource &&
+    left.optInProof === right.optInProof
+  );
+}
+
+function newerVisit(left: string | null, right: string | null) {
+  if (!left) return right;
+  if (!right) return left;
+  return left >= right ? left : right;
+}
+
+function mergeImportedCustomer(existing: Customer, incoming: ParsedCustomerRow): Customer {
+  const incomingProven = hasProvenOptIn({
+    optIn: incoming.optIn,
+    optInAt: incoming.optInAt,
+    optInSource: incoming.optInSource,
+    optInProof: incoming.optInProof,
+  });
+  return {
+    ...existing,
+    name: incoming.name.trim().length >= 2 ? incoming.name.trim() : existing.name,
+    lastPurchaseAt: newerVisit(existing.lastPurchaseAt, incoming.lastPurchaseAt),
+    orderCount:
+      incoming.orderCount !== null && incoming.orderCount !== undefined
+        ? incoming.orderCount
+        : existing.orderCount ?? 0,
+    optIn: incomingProven ? true : existing.optIn,
+    optInAt: incomingProven ? incoming.optInAt ?? existing.optInAt : existing.optInAt,
+    optInSource: incomingProven ? incoming.optInSource : existing.optInSource,
+    optInProof: incomingProven ? incoming.optInProof : existing.optInProof,
+  };
 }
 
 export async function createCustomer(restaurantId: string, input: CustomerInput) {
@@ -253,6 +432,7 @@ export async function createCustomer(restaurantId: string, input: CustomerInput)
     throw new Error("Opt-in exige origem e comprovante auditável.");
   }
   const lastPurchaseAt = parseVisitAt(input.lastVisitAt) ?? new Date().toISOString();
+  const orderCount = Math.max(0, Math.floor(input.orderCount ?? 1));
   const createdAt = new Date().toISOString();
   const optInAt = input.optIn ? createdAt : null;
 
@@ -269,6 +449,7 @@ export async function createCustomer(restaurantId: string, input: CustomerInput)
       name,
       phone,
       lastPurchaseAt,
+      orderCount,
       optIn: input.optIn,
       optInAt,
       optInSource: input.optInSource?.trim() ?? null,
@@ -297,14 +478,13 @@ export async function createCustomer(restaurantId: string, input: CustomerInput)
       name,
       phone,
       last_purchase_at: lastPurchaseAt,
+      order_count: orderCount,
       opt_in: input.optIn,
       opt_in_at: optInAt,
       opt_in_source: input.optIn ? input.optInSource?.trim() : null,
       opt_in_proof: input.optIn ? input.optInProof?.trim() : null,
     })
-    .select(
-      "id, restaurant_id, name, phone, last_purchase_at, opt_in, opt_in_at, opt_in_source, opt_in_proof, created_at",
-    )
+    .select(CUSTOMER_SELECT)
     .single();
   if (error || !data) throw new Error("Não foi possível salvar o cliente.");
   return withSegment(mapRow(data));
@@ -331,6 +511,8 @@ export async function updateCustomer(restaurantId: string, id: string, input: Cu
       name,
       phone,
       lastPurchaseAt: visitAt ?? existing.lastPurchaseAt,
+      orderCount:
+        input.orderCount !== undefined ? Math.max(0, Math.floor(input.orderCount)) : existing.orderCount ?? 0,
       optIn: input.optIn,
       optInAt: input.optIn ? existing.optInAt ?? optInAt : null,
       optInSource: input.optIn ? input.optInSource?.trim() ?? null : null,
@@ -361,6 +543,9 @@ export async function updateCustomer(restaurantId: string, id: string, input: Cu
       name,
       phone,
       ...(visitAt ? { last_purchase_at: visitAt } : {}),
+      ...(input.orderCount !== undefined
+        ? { order_count: Math.max(0, Math.floor(input.orderCount)) }
+        : {}),
       opt_in: input.optIn,
       opt_in_at: input.optIn ? optInAt : null,
       opt_in_source: input.optIn ? input.optInSource?.trim() : null,
@@ -368,9 +553,7 @@ export async function updateCustomer(restaurantId: string, id: string, input: Cu
     })
     .eq("id", id)
     .eq("restaurant_id", restaurantId)
-    .select(
-      "id, restaurant_id, name, phone, last_purchase_at, opt_in, opt_in_at, opt_in_source, opt_in_proof, created_at",
-    )
+    .select(CUSTOMER_SELECT)
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("Cliente não encontrado.");
@@ -409,6 +592,32 @@ export async function deleteCustomer(restaurantId: string, id: string) {
   return { ok: true as const };
 }
 
+export async function deleteAllCustomers(restaurantId: string) {
+  if (isDemoMode()) {
+    const state = await readDemoState();
+    const current = assembleDemoCustomers(state);
+    await writeDemoState({
+      extras: [],
+      overrides: {},
+      deleted: [...new Set([...state.deleted, ...current.map((customer) => customer.id)])],
+    });
+    await clearCustomersImportedAt(restaurantId);
+    return { ok: true as const, deleted: current.length };
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) throw new Error("Supabase admin indisponível.");
+
+  const { data, error } = await admin
+    .from("customers")
+    .delete()
+    .eq("restaurant_id", restaurantId)
+    .select("id");
+  if (error) throw error;
+  await clearCustomersImportedAt(restaurantId);
+  return { ok: true as const, deleted: (data ?? []).length };
+}
+
 export async function registerVisit(restaurantId: string, customerId: string) {
   const now = new Date().toISOString();
   if (isDemoMode()) {
@@ -416,7 +625,11 @@ export async function registerVisit(restaurantId: string, customerId: string) {
     const current = assembleDemoCustomers(state);
     const existing = current.find((customer) => customer.id === customerId);
     if (!existing) throw new Error("Cliente não encontrado.");
-    const next: Customer = { ...existing, lastPurchaseAt: now };
+    const next: Customer = {
+      ...existing,
+      lastPurchaseAt: now,
+      orderCount: (existing.orderCount ?? 0) + 1,
+    };
     await writeDemoState({
       ...state,
       extras: state.extras.map((customer) => (customer.id === customerId ? next : customer)),
@@ -427,14 +640,23 @@ export async function registerVisit(restaurantId: string, customerId: string) {
 
   const admin = createSupabaseAdminClient();
   if (!admin) throw new Error("Supabase admin indisponível.");
-  const { data, error } = await admin
+  const { data: current, error: currentError } = await admin
     .from("customers")
-    .update({ last_purchase_at: now })
+    .select("order_count")
     .eq("id", customerId)
     .eq("restaurant_id", restaurantId)
-    .select(
-      "id, restaurant_id, name, phone, last_purchase_at, opt_in, opt_in_at, opt_in_source, opt_in_proof, created_at",
-    )
+    .maybeSingle();
+  if (currentError) throw currentError;
+  if (!current) throw new Error("Cliente não encontrado.");
+  const { data, error } = await admin
+    .from("customers")
+    .update({
+      last_purchase_at: now,
+      order_count: (Number(current.order_count) || 0) + 1,
+    })
+    .eq("id", customerId)
+    .eq("restaurant_id", restaurantId)
+    .select(CUSTOMER_SELECT)
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("Cliente não encontrado.");
@@ -451,6 +673,27 @@ export async function listOptedInBySegment(segment: RecencySegment, restaurantId
       optInProof: customer.optInProof,
     }),
   );
+}
+
+export async function listOptedInMatching(
+  restaurantId: string,
+  minDays: number,
+  maxDays: number,
+) {
+  const customers = await listCustomers(undefined, restaurantId);
+  return customers.filter((customer) => {
+    if (
+      !hasProvenOptIn({
+        optIn: customer.optIn,
+        optInAt: customer.optInAt,
+        optInSource: customer.optInSource,
+        optInProof: customer.optInProof,
+      })
+    ) {
+      return false;
+    }
+    return matchesAudienceDays(customer.daysWithoutVisit, minDays, maxDays);
+  });
 }
 
 export function demoRestaurantId() {

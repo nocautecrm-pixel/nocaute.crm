@@ -84,7 +84,7 @@ export default async function RelatoriosPage({
                       ? ` · ${new Date(campaign.startsAt).toLocaleString("pt-BR")}`
                       : ""}
                     {" · "}
-                    {RECENCY_SEGMENTS[campaign.segment].label}
+                    {campaign.audienceName ?? RECENCY_SEGMENTS[campaign.segment].label}
                   </p>
                 </Link>
                 <PauseResumeButtons campaignId={campaign.id} status={campaign.status} />

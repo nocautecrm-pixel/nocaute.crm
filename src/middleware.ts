@@ -99,8 +99,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: "Faça login para continuar." }, { status: 401 });
     }
     const loginUrl = request.nextUrl.clone();
+    const next = `${pathname}${request.nextUrl.search}`;
     loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("next", pathname);
+    loginUrl.search = "";
+    loginUrl.searchParams.set("next", next);
     return NextResponse.redirect(loginUrl);
   }
 

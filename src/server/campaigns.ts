@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { BRAND } from "@/lib/brand";
 import {
   BackendUnavailableError,
-  DEMO_RESTAURANT_ID,
   isDemoMode,
   isRedisConfigured,
   requireLiveBackend,
@@ -18,13 +17,15 @@ import { customerFirstName } from "@/lib/customers/opt-in";
 import { findCustomersInMarketingCooldown } from "@/server/compliance/marketing-guard";
 import { reserveCampaignQuota } from "@/server/billing/quota-gateway";
 import { releaseCampaignQuota } from "@/server/billing/quota-rpc";
-import { listOptedInBySegment } from "@/server/customers";
+import { listOptedInMatching } from "@/server/customers";
+import { getAudience } from "@/server/audiences";
+import { RECENCY_SEGMENTS, segmentForDayRange } from "@/lib/segments/recency";
 import { getCurrentRestaurantId } from "@/server/tenant";
 import { assertWhatsAppReadyForCampaign } from "@/server/whatsapp-health";
 import type { Campaign } from "@/types/database";
 
 const CAMPAIGN_COLUMNS =
-  "id, restaurant_id, name, segment, template_name, template_language, status, created_at, starts_at, establishment_name, promo_code, offer_body, media_type, media_url, media_caption, cta_url, cta_label, discount_label";
+  "id, restaurant_id, name, segment, template_name, template_language, status, created_at, starts_at, establishment_name, promo_code, offer_body, media_type, media_url, media_caption, cta_url, cta_label, discount_label, audience_id";
 const DEMO_CAMPAIGNS_COOKIE = "nocaute_campaigns";
 
 function mapCampaign(row: Record<string, unknown>): Campaign {
@@ -47,7 +48,22 @@ function mapCampaign(row: Record<string, unknown>): Campaign {
     ctaUrl: (row.cta_url as string) ?? null,
     ctaLabel: (row.cta_label as string) ?? "Resgatar Cupom",
     discountLabel: (row.discount_label as string) ?? "15% OFF",
+    audienceId: (row.audience_id as string) ?? null,
+    audienceName: nestedAudienceName(row.audiences),
   };
+}
+
+function nestedAudienceName(value: unknown) {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    const name = (value[0] as { name?: string } | undefined)?.name;
+    return name ?? null;
+  }
+  if (typeof value === "object" && "name" in value) {
+    const name = (value as { name?: string }).name;
+    return name ?? null;
+  }
+  return null;
 }
 
 function normalizeHttpUrl(url?: string) {
@@ -101,15 +117,36 @@ export async function listCampaigns(): Promise<Campaign[]> {
   if (!admin) throw new BackendUnavailableError();
 
   const restaurantId = await getCurrentRestaurantId();
-  const query = admin
+  const { data, error } = await admin
     .from("campaigns")
     .select(CAMPAIGN_COLUMNS)
     .eq("restaurant_id", restaurantId)
     .order("created_at", { ascending: false });
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []).map((row) => mapCampaign(row as Record<string, unknown>));
+  const rows =
+    error && /audience_id/i.test(error.message)
+      ? (
+          await admin
+            .from("campaigns")
+            .select(CAMPAIGN_COLUMNS.replace(", audience_id", ""))
+            .eq("restaurant_id", restaurantId)
+            .order("created_at", { ascending: false })
+        )
+      : { data, error };
+
+  if (rows.error) throw rows.error;
+  const campaigns = (rows.data ?? []).map((row) => mapCampaign(row as Record<string, unknown>));
+  const audienceIds = [
+    ...new Set(campaigns.map((campaign) => campaign.audienceId).filter((id): id is string => Boolean(id))),
+  ];
+  if (audienceIds.length === 0) return campaigns;
+
+  const { data: audienceRows } = await admin.from("audiences").select("id, name").in("id", audienceIds);
+  const names = Object.fromEntries((audienceRows ?? []).map((row) => [String(row.id), String(row.name)]));
+  return campaigns.map((campaign) => ({
+    ...campaign,
+    audienceName: campaign.audienceId ? names[campaign.audienceId] ?? campaign.audienceName ?? null : campaign.audienceName ?? null,
+  }));
 }
 
 export async function getCampaign(id: string) {
@@ -119,9 +156,30 @@ export async function getCampaign(id: string) {
 
 export async function createCampaign(restaurantId: string, input: unknown) {
   const payload = createCampaignSchema.parse(input);
-  const segmentMatches = (await listOptedInBySegment(payload.segment, restaurantId)).filter(
-    (customer) => customer.segment === payload.segment,
-  );
+  let minDays: number;
+  let maxDays: number;
+  let segment = payload.segment;
+  let audienceId: string | null = null;
+  let audienceName: string | null = null;
+
+  if (payload.audienceId) {
+    const audience = await getAudience(payload.audienceId, restaurantId);
+    if (!audience) throw new Error("Público não encontrado.");
+    minDays = audience.minDays;
+    maxDays = audience.maxDays;
+    segment = segmentForDayRange(minDays, maxDays);
+    audienceId = audience.id.startsWith("aud-") ? null : audience.id;
+    audienceName = audience.name;
+  } else if (segment) {
+    minDays = RECENCY_SEGMENTS[segment].minDays;
+    maxDays = RECENCY_SEGMENTS[segment].maxDays;
+  } else {
+    throw new Error("Escolha um público da base de clientes.");
+  }
+
+  if (!segment) throw new Error("Escolha um público da base de clientes.");
+
+  const segmentMatches = await listOptedInMatching(restaurantId, minDays, maxDays);
   const cooldown = await findCustomersInMarketingCooldown(
     restaurantId,
     segmentMatches.map((customer) => customer.id),
@@ -133,7 +191,7 @@ export async function createCampaign(restaurantId: string, input: unknown) {
 
   if (segmentMatches.length === 0) {
     throw new Error(
-      "Nenhum cliente com opt-in comprovado neste segmento. Importe a planilha com origem e comprovante.",
+      "Nenhum cliente com opt-in comprovado neste público. Importe a planilha com origem e comprovante.",
     );
   }
 
@@ -164,7 +222,7 @@ export async function createCampaign(restaurantId: string, input: unknown) {
       id: `demo-${Date.now()}`,
       restaurantId,
       name: payload.name,
-      segment: payload.segment,
+      segment,
       templateName: payload.templateName,
       templateLanguage: payload.templateLanguage,
       status: schedule.scheduled ? "scheduled" : "queued",
@@ -179,6 +237,8 @@ export async function createCampaign(restaurantId: string, input: unknown) {
       ctaUrl,
       ctaLabel: payload.ctaLabel,
       discountLabel: payload.discountLabel,
+      audienceId,
+      audienceName,
     };
     const extras = await readDemoCreated();
     await writeDemoCreated([campaign, ...extras]);
@@ -206,7 +266,8 @@ export async function createCampaign(restaurantId: string, input: unknown) {
     .insert({
       restaurant_id: restaurantId,
       name: payload.name,
-      segment: payload.segment,
+      segment,
+      audience_id: audienceId,
       template_name: payload.templateName,
       template_language: payload.templateLanguage,
       status,

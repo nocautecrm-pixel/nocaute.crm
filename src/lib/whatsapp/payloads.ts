@@ -1,8 +1,9 @@
 import {
-  CONFIRM_OPTIN_PAYLOAD,
+  CONTINUE_OFFER_PAYLOAD,
   DEFAULT_CTA_LABEL,
   OPTIN_TEMPLATE,
   RETURN_TEMPLATE,
+  STOP_OFFERS_PAYLOAD,
 } from "@/lib/whatsapp/constants";
 import { toWhatsAppRecipient } from "@/lib/whatsapp/phone";
 
@@ -87,32 +88,6 @@ export function withCouponQuery(url: string, coupon: string) {
   }
 }
 
-/**
- * Etapa 1 — HSM aprovado com Quick Reply "Confirmar".
- *
- * {
- *   "messaging_product": "whatsapp",
- *   "recipient_type": "individual",
- *   "to": "5511999998888",
- *   "type": "template",
- *   "template": {
- *     "name": "optin_confirmacao",
- *     "language": { "code": "pt_BR" },
- *     "components": [
- *       {
- *         "type": "body",
- *         "parameters": [{ "type": "text", "text": "Saladeria com Limão e Sal" }]
- *       },
- *       {
- *         "type": "button",
- *         "sub_type": "quick_reply",
- *         "index": "0",
- *         "parameters": [{ "type": "payload", "payload": "CONFIRM_OPTIN" }]
- *       }
- *     ]
- *   }
- * }
- */
 /** Slug dinâmico do botão URL (substitui {{1}} na URL registrada no template). */
 export function buildTemplateUrlSlug(ctaUrl: string, couponCode?: string) {
   try {
@@ -131,7 +106,46 @@ export function buildTemplateUrlSlug(ctaUrl: string, couponCode?: string) {
 }
 
 /**
- * Template MARKETING warm base — {{1}} = primeiro nome do cliente + botão URL.
+ * Etapa 1 — HSM aprovado com quick replies Continuar / Não receber oferta.
+ */
+export function buildOptInTemplatePayload(input: {
+  to: string;
+  establishmentName: string;
+  templateName?: string;
+  language?: string;
+}): TemplateOptInPayload {
+  return {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: toWhatsAppRecipient(input.to),
+    type: "template",
+    template: {
+      name: input.templateName ?? OPTIN_TEMPLATE.name,
+      language: { code: input.language ?? OPTIN_TEMPLATE.language },
+      components: [
+        {
+          type: "body",
+          parameters: [{ type: "text", text: input.establishmentName }],
+        },
+        {
+          type: "button",
+          sub_type: "quick_reply",
+          index: "0",
+          parameters: [{ type: "payload", payload: CONTINUE_OFFER_PAYLOAD }],
+        },
+        {
+          type: "button",
+          sub_type: "quick_reply",
+          index: "1",
+          parameters: [{ type: "payload", payload: STOP_OFFERS_PAYLOAD }],
+        },
+      ],
+    },
+  };
+}
+
+/**
+ * Template MARKETING com botão URL (legado / templates auxiliares).
  */
 export function buildReturnTemplatePayload(input: {
   to: string;
@@ -160,36 +174,6 @@ export function buildReturnTemplatePayload(input: {
           sub_type: "url",
           index: "0",
           parameters: [{ type: "text", text: urlSlug }],
-        },
-      ],
-    },
-  };
-}
-
-export function buildOptInTemplatePayload(input: {
-  to: string;
-  establishmentName: string;
-  templateName?: string;
-  language?: string;
-}): TemplateOptInPayload {
-  return {
-    messaging_product: "whatsapp",
-    recipient_type: "individual",
-    to: toWhatsAppRecipient(input.to),
-    type: "template",
-    template: {
-      name: input.templateName ?? OPTIN_TEMPLATE.name,
-      language: { code: input.language ?? OPTIN_TEMPLATE.language },
-      components: [
-        {
-          type: "body",
-          parameters: [{ type: "text", text: input.establishmentName }],
-        },
-        {
-          type: "button",
-          sub_type: "quick_reply",
-          index: "0",
-          parameters: [{ type: "payload", payload: CONFIRM_OPTIN_PAYLOAD }],
         },
       ],
     },

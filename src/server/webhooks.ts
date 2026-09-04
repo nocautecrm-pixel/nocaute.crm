@@ -5,14 +5,14 @@ import type { CampaignOfferJob } from "@/lib/queue/jobs";
 import { getCampaignOfferQueue } from "@/lib/queue/queues";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
-  isConfirmOptInClick,
+  isContinueOfferClick,
+  isStopOffersClick,
   parseWebhookPayload,
   type MetaInboundMessage,
 } from "@/lib/whatsapp/inbound";
 import { digitsOnly, phonesMatch } from "@/lib/whatsapp/phone";
 import { withCouponQuery } from "@/lib/whatsapp/payloads";
 import { redeemCoupon } from "@/server/conversions";
-import { replyWithBrandDna } from "@/server/chatbot-engine";
 import {
   findRestaurantByPhoneNumberId,
   touchLastInbound,
@@ -27,6 +27,7 @@ export async function ingestWhatsAppPayload(rawBody: string) {
   let conversions = 0;
   let statuses = 0;
   let confirms = 0;
+  let declines = 0;
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -41,9 +42,18 @@ export async function ingestWhatsAppPayload(rawBody: string) {
         const restaurantId = await findRestaurantByPhoneNumberId(value.metadata?.phone_number_id);
         if (restaurantId) await touchLastInbound(restaurantId);
 
-        if (isConfirmOptInClick(message)) {
+        if (isStopOffersClick(message)) {
           if (!restaurantId) {
-            throw new Error("phone_number_id sem loja mapeada para confirmar opt-in.");
+            throw new Error("phone_number_id sem loja mapeada para opt-out.");
+          }
+          const result = await handleStopOffers(message, restaurantId);
+          if (result.ok) declines += 1;
+          continue;
+        }
+
+        if (isContinueOfferClick(message)) {
+          if (!restaurantId) {
+            throw new Error("phone_number_id sem loja mapeada para Continuar.");
           }
           const result = await handleOptInConfirmation(message, restaurantId);
           if (result.enqueued || result.demo) confirms += 1;
@@ -55,22 +65,13 @@ export async function ingestWhatsAppPayload(rawBody: string) {
         if (code && restaurantId) {
           const redeemed = await redeemCoupon(code, "inbound_whatsapp", restaurantId);
           if ("ok" in redeemed && redeemed.ok) conversions += 1;
-          continue;
         }
-
-        if (restaurantId && body.trim()) {
-          await replyWithBrandDna({
-            restaurantId,
-            storeName: BRAND.storeName,
-            to: message.from,
-            customerMessage: body,
-          });
-        }
+        // Sem chatbot: qualquer outra msg do cliente é ignorada pela ferramenta.
       }
     }
   }
 
-  return { ignored: false, statuses, conversions, confirms };
+  return { ignored: false, statuses, conversions, confirms, declines };
 }
 
 async function applyDeliveryStatus(wamid: string, status: string) {
@@ -115,13 +116,71 @@ async function findJobByWamid(wamid: string) {
   return null;
 }
 
+export async function handleStopOffers(message: MetaInboundMessage, restaurantId: string) {
+  if (isDemoMode()) {
+    return { ok: true as const, demo: true as const, from: digitsOnly(message.from) };
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    throw new Error("Supabase admin indisponível para processar opt-out.");
+  }
+
+  const job = await findAwaitingJob(message, restaurantId);
+
+  if (job) {
+    await admin
+      .from("customers")
+      .update({
+        opt_in: false,
+        opt_in_at: new Date().toISOString(),
+        opt_in_source: "recusa_whatsapp",
+        opt_in_proof: `wamid:${message.id}`,
+      })
+      .eq("id", job.customer_id)
+      .eq("restaurant_id", restaurantId);
+
+    await admin
+      .from("campaign_jobs")
+      .update({ status: "skipped" })
+      .eq("id", job.id)
+      .eq("restaurant_id", restaurantId)
+      .in("status", AWAITING);
+
+    return { ok: true as const, campaignJobId: job.id };
+  }
+
+  const { data: customers } = await admin
+    .from("customers")
+    .select("id, phone")
+    .eq("restaurant_id", restaurantId)
+    .limit(200);
+
+  const match = (customers ?? []).find((row) => phonesMatch(row.phone, message.from));
+  if (match) {
+    await admin
+      .from("customers")
+      .update({
+        opt_in: false,
+        opt_in_at: new Date().toISOString(),
+        opt_in_source: "recusa_whatsapp",
+        opt_in_proof: `wamid:${message.id}`,
+      })
+      .eq("id", match.id)
+      .eq("restaurant_id", restaurantId);
+    return { ok: true as const, customerId: match.id };
+  }
+
+  return { ok: false as const, reason: "customer_not_found" as const };
+}
+
 export async function handleOptInConfirmation(message: MetaInboundMessage, restaurantId: string) {
   if (isDemoMode()) {
     return {
       demo: true as const,
       from: digitsOnly(message.from),
       next: "offer_sequence" as const,
-      message: "Clique em Confirmar detectado. Sem banco, a sequência de oferta não é disparada.",
+      message: "Continuar detectado. Sem banco, a sequência de oferta não é disparada.",
     };
   }
 

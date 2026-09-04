@@ -1,12 +1,15 @@
 import { Percent, TrendingUp, Users } from "lucide-react";
+import { AdviceBoard } from "@/components/advisor/AdviceBoard";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { cardClass, eyebrowClass } from "@/components/ui/tokens";
 import { formatBRL } from "@/lib/demo/store";
+import { getCampaignAdvice } from "@/server/advisor/gateway";
 import { getRoiSummary } from "@/server/roi";
 import { getStorePanel } from "@/server/store";
 
 export default async function VisaoGeralPage() {
   const [store, roi] = await Promise.all([getStorePanel(), getRoiSummary()]);
+  const advice = await getCampaignAdvice({ store, roi });
   const conversion = Math.min(store.kpis.couponConversionPct, 100);
   const liveStats = [
     { label: "Na fila", value: roi.queued, tone: "text-amber-600", dot: "pending" as const },
@@ -16,10 +19,17 @@ export default async function VisaoGeralPage() {
     { label: "Cupons gerados", value: roi.couponsIssued, tone: "text-[#111B21]", dot: "idle" as const },
     { label: "Cupons usados", value: roi.couponsRedeemed, tone: "text-emerald-600", dot: "live" as const },
   ];
+  const checklistIncomplete =
+    !store.storeName.trim() ||
+    !store.menuUrl.trim() ||
+    !store.hoursText.trim() ||
+    !store.whatsapp.connected ||
+    store.quota.included <= 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
+      <AdviceBoard items={advice} />
+      <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3">
         <article className={`${cardClass} flex flex-col justify-between p-4`}>
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm font-medium text-[#667781]">Receita gerada no mês</p>
@@ -81,7 +91,7 @@ export default async function VisaoGeralPage() {
         ))}
       </section>
 
-      <PilotChecklist store={store} />
+      {checklistIncomplete ? <PilotChecklist store={store} /> : null}
     </div>
   );
 }
@@ -90,7 +100,7 @@ function PilotChecklist({ store }: { store: Awaited<ReturnType<typeof getStorePa
   const items = [
     { ok: Boolean(store.storeName.trim()), label: "Nome da loja preenchido" },
     { ok: Boolean(store.menuUrl.trim()), label: "Link do cardápio no perfil" },
-    { ok: Boolean(store.hoursText.trim()), label: "Horário cadastrado (chatbot não inventa)" },
+    { ok: Boolean(store.hoursText.trim()), label: "Horário cadastrado no perfil da loja" },
     { ok: store.whatsapp.connected, label: "WhatsApp da casa conectado" },
     { ok: store.quota.included > 0, label: "Franquia de leads no ar (plano combinado)" },
   ];

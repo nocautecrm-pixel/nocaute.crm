@@ -100,7 +100,7 @@ export function SignupForm({
 
       if (!data.session) {
         setInfo(
-          "Enviamos um e-mail de confirmação. Abra o link — a loja será criada com o nome que você preencheu. Depois entre com o mesmo e-mail.",
+          "Enviamos um e-mail de confirmação. Abra o link e você volta para esta tela de login. Entre com o mesmo e-mail e senha.",
         );
         return;
       }
@@ -127,7 +127,7 @@ export function SignupForm({
               className={inputClass}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="voce@loja.com"
+              placeholder="Digite o e-mail da sua loja"
               required
             />
           </label>
@@ -156,7 +156,7 @@ export function SignupForm({
           className={inputClass}
           value={storeName}
           onChange={(event) => setStoreName(event.target.value)}
-          placeholder="Saladeria com Limão e Sal"
+          placeholder="Digite o nome do seu restaurante"
           required
         />
       </label>
@@ -169,7 +169,7 @@ export function SignupForm({
           className={inputClass}
           value={city}
           onChange={(event) => setCity(event.target.value)}
-          placeholder="São Paulo"
+          placeholder="Digite a cidade do seu restaurante"
           required
         />
       </label>

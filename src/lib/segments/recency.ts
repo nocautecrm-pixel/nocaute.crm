@@ -61,6 +61,11 @@ export function matchesSegment(days: number, segment: RecencySegment) {
   return days >= minDays && days <= maxDays;
 }
 
+/** Faixa de um público → segmento legado da campanha (check constraint). */
+export function segmentForDayRange(minDays: number, maxDays: number): RecencySegment {
+  return segmentForDays(Math.floor((minDays + maxDays) / 2)) ?? "perdidos";
+}
+
 /** Data de última visita no meio da faixa, para o lojista mudar a situação sem calcular dias. */
 export function lastPurchaseForSegment(segment: RecencySegment, now = new Date()) {
   const days = { ativos: 7, em_risco: 23, inativos: 45, perdidos: 90 }[segment];

@@ -64,9 +64,11 @@ function parseDbUrl(raw) {
   return { user, password, host, port, database };
 }
 
+const only = process.argv[2];
 const files = readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql"))
-  .sort();
+  .sort()
+  .filter((name) => !only || name === only || name.startsWith(only));
 
 if (!files.length) {
   console.error("Nenhum arquivo em supabase/migrations/");

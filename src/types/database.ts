@@ -37,6 +37,7 @@ export type Customer = {
   name: string;
   phone: string;
   lastPurchaseAt: string | null;
+  orderCount: number;
   optIn: boolean;
   optInAt: string | null;
   optInSource: string | null;
@@ -68,6 +69,8 @@ export type Campaign = {
   ctaUrl: string | null;
   ctaLabel: string;
   discountLabel: string;
+  audienceId?: string | null;
+  audienceName?: string | null;
 };
 
 export type Coupon = {

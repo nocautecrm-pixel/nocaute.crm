@@ -5,7 +5,7 @@ import {
   APPROVED_TEMPLATES,
   DEFAULT_CTA_LABEL,
   DEFAULT_MEDIA_CAPTION,
-  RETURN_TEMPLATE,
+  OPTIN_TEMPLATE,
 } from "@/lib/whatsapp/constants";
 
 const approvedTemplateNames = APPROVED_TEMPLATES.map((template) => template.name) as [
@@ -23,11 +23,40 @@ export const recencySegmentSchema = z.enum([
   "perdidos",
 ]);
 
+export const createAudienceSchema = z
+  .object({
+    name: z.string().trim().min(2).max(40),
+    minDays: z.number().int().min(0).max(120),
+    maxDays: z.number().int().min(0).max(120),
+  })
+  .refine((value) => value.maxDays >= value.minDays, {
+    message: "A faixa de dias está invertida.",
+    path: ["maxDays"],
+  });
+
+export const updateAudienceSchema = z
+  .object({
+    name: z.string().trim().min(2).max(40).optional(),
+    minDays: z.number().int().min(0).max(120).optional(),
+    maxDays: z.number().int().min(0).max(120).optional(),
+  })
+  .refine(
+    (value) =>
+      value.minDays === undefined ||
+      value.maxDays === undefined ||
+      value.maxDays >= value.minDays,
+    {
+      message: "A faixa de dias está invertida.",
+      path: ["maxDays"],
+    },
+  );
+
 export const createCampaignSchema = z.object({
   name: z.string().min(3).max(80),
-  segment: recencySegmentSchema,
-  templateName: z.enum(approvedTemplateNames).default(RETURN_TEMPLATE.name),
-  templateLanguage: z.string().default(RETURN_TEMPLATE.language),
+  audienceId: z.string().min(1).optional(),
+  segment: recencySegmentSchema.optional(),
+  templateName: z.enum(approvedTemplateNames).default(OPTIN_TEMPLATE.name),
+  templateLanguage: z.string().default(OPTIN_TEMPLATE.language),
   establishmentName: z.string().min(2).max(60),
   promoCode: z
     .string()
@@ -43,6 +72,9 @@ export const createCampaignSchema = z.object({
   ctaUrl: z.string().optional(),
   ctaLabel: z.string().min(1).max(20).default(DEFAULT_CTA_LABEL),
   startsAt: z.string().optional(),
+}).refine((value) => Boolean(value.audienceId || value.segment), {
+  message: "Escolha um público da base de clientes.",
+  path: ["audienceId"],
 });
 
 export const redeemCouponSchema = z.object({
@@ -73,6 +105,7 @@ export const upsertCustomerSchema = z
     phone: z.string().trim().min(8).max(24),
     segment: recencySegmentSchema.optional(),
     lastVisitAt: z.string().trim().max(40).optional(),
+    orderCount: z.coerce.number().int().min(0).max(100_000).optional(),
     optIn: z.boolean(),
     optInSource: z.enum(OPT_IN_SOURCES).optional(),
     optInProof: z.string().trim().max(120).optional(),
@@ -94,13 +127,6 @@ export const upsertCustomerSchema = z
       });
     }
   });
-export const brandDnaSchema = z.object({
-  personality: z.string().trim().max(280).default(""),
-  tone: z.enum(["descontraido", "objetivo", "premium", "formal"]),
-  detailLevel: z.enum(["curto", "medio", "completo"]),
-  emojis: z.boolean(),
-  greeting: z.string().trim().max(80).default(""),
-});
 
 export const loginSchema = z.object({
   email: z.string().trim().email("E-mail inválido"),

@@ -1,5 +1,7 @@
 export const BRAND = {
   productName: "Nocaute CRM",
+  logoUrl: "/brand/logo.png",
+  authBackgroundUrl: "/auth/login-background.jpg",
   storeName: "Saladeria com Limão e Sal",
   promoCode: "LIMAO15",
   discountLabel: "15% OFF",

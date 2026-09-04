@@ -26,7 +26,9 @@ export default async function CampanhaDetalhePage({
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className={eyebrowClass}>{RECENCY_SEGMENTS[campaign.segment].label}</p>
+          <p className={eyebrowClass}>
+            {campaign.audienceName ?? RECENCY_SEGMENTS[campaign.segment].label}
+          </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
             {campaign.name}
           </h1>

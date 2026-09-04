@@ -13,15 +13,24 @@ function loginQueryMessage(error: string | null) {
   return null;
 }
 
+function loginQueryInfo(confirmed: string | null) {
+  if (confirmed === "1") {
+    return "E-mail confirmado. Entre com o e-mail e a senha da conta que você acabou de criar.";
+  }
+  return null;
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = safeInternalPath(searchParams.get("next"), "/");
   const queryError = loginQueryMessage(searchParams.get("error"));
+  const queryInfo = loginQueryInfo(searchParams.get("confirmed"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(queryError);
+  const [info] = useState<string | null>(queryInfo);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(event: React.FormEvent) {
@@ -68,7 +77,7 @@ export function LoginForm() {
           className={inputClass}
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="voce@loja.com"
+          placeholder="Digite o e-mail da sua loja"
           required
         />
       </label>
@@ -81,7 +90,7 @@ export function LoginForm() {
           className={inputClass}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="••••••••"
+          placeholder="Digite a senha"
           required
         />
       </label>
@@ -89,6 +98,12 @@ export function LoginForm() {
       <p className="text-right text-sm">
         <AuthLink href="/recuperar-senha">Esqueci a senha</AuthLink>
       </p>
+
+      {info && !error ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {info}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

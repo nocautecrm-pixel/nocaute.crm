@@ -48,3 +48,6 @@ yarn-error.log*
 !/public/uploads/criativos/.gitkeep
 /public/uploads/logo/*
 !/public/uploads/logo/.gitkeep
+
+.vercel
+.env*

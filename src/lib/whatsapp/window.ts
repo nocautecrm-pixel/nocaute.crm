@@ -1,5 +1,6 @@
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/** Janela de atendimento Meta (24h após última msg do cliente). Usada só para status da conexão. */
 export function customerCareWindow(lastInboundAt: string | null) {
   if (!lastInboundAt) {
     return { open: false, hoursLeft: null as number | null };

@@ -1,5 +1,4 @@
 import type { QuotaSnapshot } from "@/lib/billing/plans";
-import type { BrandDna } from "@/lib/chatbot/dna";
 
 export type WhatsAppConnection = {
   connected: boolean;
@@ -33,7 +32,6 @@ export type StorePanel = {
   address: string;
   hoursText: string;
   whatsapp: WhatsAppConnection;
-  chatbot: BrandDna;
   quota: QuotaSnapshot;
   meta: {
     officialApi: true;

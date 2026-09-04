@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
-import { DEFAULT_BRAND_DNA } from "@/lib/chatbot/dna";
-import { customerCareWindow } from "@/lib/chatbot/window";
+import { customerCareWindow } from "@/lib/whatsapp/window";
 import {
   BackendUnavailableError,
   DEMO_RESTAURANT_ID,
@@ -24,7 +23,6 @@ import {
 } from "@/lib/whatsapp/constants";
 import { getQuotaSnapshot } from "@/server/billing/quota-gateway";
 import { listCampaigns } from "@/server/campaigns";
-import { getBrandDnaForRestaurant } from "@/server/chatbot";
 import { getRoiSummary } from "@/server/roi";
 import { uploadRestaurantMedia } from "@/server/media";
 import { getCurrentRestaurantId } from "@/server/tenant";
@@ -55,7 +53,6 @@ export async function getStorePanel(): Promise<StorePanel> {
         },
         demoConnected,
       ),
-      chatbot: DEFAULT_BRAND_DNA,
       quota,
     };
   }
@@ -70,7 +67,7 @@ export async function getStorePanel(): Promise<StorePanel> {
   const restaurantId = await getCurrentRestaurantId();
   const quota = await getQuotaSnapshot(restaurantId);
 
-  const [{ data: restaurant }, { data: account }, roi, campaigns, chatbot] = await Promise.all([
+  const [{ data: restaurant }, { data: account }, roi, campaigns] = await Promise.all([
     admin.from("restaurants").select("name, city, logo_url, menu_url, address, hours_text").eq("id", restaurantId).maybeSingle(),
     admin
       .from("whatsapp_accounts")
@@ -81,7 +78,6 @@ export async function getStorePanel(): Promise<StorePanel> {
       .maybeSingle(),
     getRoiSummary(restaurantId),
     listCampaigns(),
-    getBrandDnaForRestaurant(restaurantId),
   ]);
 
   const connected = account?.status === "connected";
@@ -111,7 +107,6 @@ export async function getStorePanel(): Promise<StorePanel> {
       windowOpen: window.open,
       windowHoursLeft: window.hoursLeft,
     },
-    chatbot,
     quota,
     meta: buildMetaHealth({
       connected,

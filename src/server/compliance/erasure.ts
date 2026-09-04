@@ -17,6 +17,7 @@ export async function eraseRestaurantPersonalData(
   throwIfError((await scoped("coupons")).error);
   throwIfError((await scoped("customers")).error);
   throwIfError((await scoped("campaigns")).error);
+  throwIfError((await scoped("audiences")).error);
   throwIfError((await scoped("chatbot_profiles")).error);
 
   const { error: whatsappError } = await admin

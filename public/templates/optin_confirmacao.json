@@ -1,0 +1,59 @@
+{
+  "name": "optin_confirmacao",
+  "language": "pt_BR",
+  "category": "MARKETING",
+  "description": "Primeiro contato — Continuar envia a oferta; Não receber oferta encerra sem mais msgs da ferramenta.",
+  "creation": {
+    "method": "POST",
+    "path": "/{WABA_ID}/message_templates",
+    "body": {
+      "name": "optin_confirmacao",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi! Vimos que você é cliente da {{1}}. Sentimos sua falta e preparamos ofertas e promoções pra você. Se quiser economizar e comer gostoso, toque em Continuar que enviamos a oferta. Se preferir não receber, toque em Não receber oferta.",
+          "example": {
+            "body_text": [["Saladeria com Limão e Sal"]]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            { "type": "QUICK_REPLY", "text": "Continuar" },
+            { "type": "QUICK_REPLY", "text": "Não receber oferta" }
+          ]
+        }
+      ]
+    }
+  },
+  "send_example": {
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": "5511999998888",
+    "type": "template",
+    "template": {
+      "name": "optin_confirmacao",
+      "language": { "code": "pt_BR" },
+      "components": [
+        {
+          "type": "body",
+          "parameters": [{ "type": "text", "text": "Saladeria com Limão e Sal" }]
+        },
+        {
+          "type": "button",
+          "sub_type": "quick_reply",
+          "index": "0",
+          "parameters": [{ "type": "payload", "payload": "CONTINUE_OFFER" }]
+        },
+        {
+          "type": "button",
+          "sub_type": "quick_reply",
+          "index": "1",
+          "parameters": [{ "type": "payload", "payload": "STOP_OFFERS" }]
+        }
+      ]
+    }
+  }
+}

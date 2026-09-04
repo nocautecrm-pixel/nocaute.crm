@@ -1,37 +1,29 @@
 import { CustomerBoard } from "@/components/clientes/CustomerBoard";
 import { isDemoMode } from "@/lib/config";
-import { RECENCY_SEGMENTS } from "@/lib/segments/recency";
-import { listCustomers } from "@/server/customers";
+import { getCustomerBoard } from "@/server/customer-board";
 import { getCurrentRestaurantId } from "@/server/tenant";
-import type { Customer, RecencySegment } from "@/types/database";
+
+export const dynamic = "force-dynamic";
 
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ segmento?: string }>;
+  searchParams: Promise<{ publico?: string }>;
 }) {
   const params = await searchParams;
-  const segmento = isSegment(params.segmento) ? params.segmento : undefined;
   const restaurantId = await getCurrentRestaurantId();
-  const rows = await listCustomers(segmento, restaurantId);
-  const customers: Customer[] = rows.map((row) => ({
-    id: row.id,
-    restaurantId: row.restaurantId,
-    name: row.name,
-    phone: row.phone,
-    lastPurchaseAt: row.lastPurchaseAt,
-    optIn: row.optIn,
-    optInAt: row.optInAt,
-    optInSource: row.optInSource,
-    optInProof: row.optInProof,
-    createdAt: row.createdAt,
-  }));
+  const board = await getCustomerBoard(restaurantId);
+  const publico = board.audiences.some((audience) => audience.slug === params.publico)
+    ? params.publico
+    : undefined;
 
   return (
-    <CustomerBoard customers={customers} demo={isDemoMode()} segmento={segmento} />
+    <CustomerBoard
+      customers={board.customers}
+      audiences={board.audiences}
+      freshness={board.freshness}
+      demo={isDemoMode()}
+      publico={publico}
+    />
   );
-}
-
-function isSegment(value?: string): value is RecencySegment {
-  return Boolean(value && value in RECENCY_SEGMENTS);
 }

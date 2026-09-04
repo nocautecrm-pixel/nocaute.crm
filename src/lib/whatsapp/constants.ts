@@ -1,16 +1,27 @@
+export const CONTINUE_BUTTON_TEXT = "Continuar";
+export const CONTINUE_OFFER_PAYLOAD = "CONTINUE_OFFER";
+
+/** Legado — ainda aceito no webhook se o template antigo estiver ativo. */
 export const CONFIRM_BUTTON_TEXT = "Confirmar";
 export const CONFIRM_OPTIN_PAYLOAD = "CONFIRM_OPTIN";
 
-/** Template legado (double opt-in). Mantido para campanhas antigas. */
+export const STOP_OFFERS_BUTTON_TEXT = "Não receber oferta";
+export const STOP_OFFERS_PAYLOAD = "STOP_OFFERS";
+
+/**
+ * Msg 1 — template MARKETING com 2 quick replies.
+ * Continuar → criativo + oferta + cupom. Não receber → opt-out e silêncio.
+ */
 export const OPTIN_TEMPLATE = {
   name: "optin_confirmacao",
   language: "pt_BR",
   category: "MARKETING" as const,
-  body: "Olá! Vimos que você é cliente da {{1}}. Estamos atualizando nossos contatos para enviar promoções exclusivas e cupons de desconto em primeira mão. Clique no botão abaixo para confirmar",
-  button: CONFIRM_BUTTON_TEXT,
+  body:
+    "Oi! Vimos que você é cliente da {{1}}. Sentimos sua falta e preparamos ofertas e promoções pra você. Se quiser economizar e comer gostoso, toque em Continuar que enviamos a oferta. Se preferir não receber, toque em Não receber oferta.",
+  buttons: [CONTINUE_BUTTON_TEXT, STOP_OFFERS_BUTTON_TEXT] as const,
 };
 
-/** Template principal para warm base (App Review). */
+/** Templates URL (legado / futuros). O fluxo principal da ferramenta é OPTIN_TEMPLATE. */
 export const RETURN_TEMPLATE = {
   name: "retorno_15_dias",
   language: "pt_BR",
@@ -20,6 +31,7 @@ export const RETURN_TEMPLATE = {
 };
 
 export const APPROVED_TEMPLATES = [
+  OPTIN_TEMPLATE,
   RETURN_TEMPLATE,
   {
     name: "aniversario_cliente",
@@ -37,7 +49,7 @@ export const APPROVED_TEMPLATES = [
   },
 ] as const;
 
-export const DEFAULT_CAMPAIGN_TEMPLATE = RETURN_TEMPLATE;
+export const DEFAULT_CAMPAIGN_TEMPLATE = OPTIN_TEMPLATE;
 
 export { DEFAULT_OFFER_BODY } from "@/lib/brand";
 

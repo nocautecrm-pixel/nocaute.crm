@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   title: "Nocaute CRM — Saladeria com Limão e Sal",
   description:
     "Nocaute CRM para a Saladeria com Limão e Sal: WhatsApp Business oficial da Meta, campanhas de reativação e cupom com ROI.",
+  icons: {
+    icon: "/brand/logo.png",
+    apple: "/brand/logo.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

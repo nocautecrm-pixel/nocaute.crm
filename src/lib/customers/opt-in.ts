@@ -4,6 +4,7 @@ export const OPT_IN_SOURCES = [
   "reserva",
   "wifi",
   "confirmacao_whatsapp",
+  "recusa_whatsapp",
 ] as const;
 
 export type OptInSource = (typeof OPT_IN_SOURCES)[number];
@@ -23,6 +24,8 @@ const SOURCE_ALIASES: Record<string, OptInSource> = {
   confirmacao: "confirmacao_whatsapp",
   confirmacao_whatsapp: "confirmacao_whatsapp",
   whatsapp: "confirmacao_whatsapp",
+  recusa_whatsapp: "recusa_whatsapp",
+  recusa: "recusa_whatsapp",
 };
 
 export const OPT_IN_SOURCE_LABELS: Record<OptInSource, string> = {
@@ -31,6 +34,7 @@ export const OPT_IN_SOURCE_LABELS: Record<OptInSource, string> = {
   reserva: "Reserva",
   wifi: "Wi-Fi / portal",
   confirmacao_whatsapp: "Confirmação WhatsApp",
+  recusa_whatsapp: "Não receber oferta (WhatsApp)",
 };
 
 export function normalizeOptInSource(raw: string): OptInSource | null {
