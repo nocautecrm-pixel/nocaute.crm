@@ -183,20 +183,22 @@ export function useEmbeddedSignup(
         );
       }, 15000);
 
-      const pending = window.FB.login(async (response) => {
-        try {
-          const code = response.authResponse?.code;
-          if (!code) {
-            throw new Error(
-              "A Meta fechou o login sem permissão de WhatsApp. Permite popups neste site e confirma o Configuration ID.",
-            );
-          }
-          await finishSignup(code);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Falha na conexão");
-        } finally {
+      const pending = window.FB.login((response) => {
+        const code = response.authResponse?.code;
+        if (!code) {
+          setError(
+            "A Meta fechou o login sem permissão de WhatsApp. Permite popups neste site e confirma o Configuration ID.",
+          );
           stopBusy();
+          return;
         }
+        void finishSignup(code)
+          .catch((err) => {
+            setError(err instanceof Error ? err.message : "Falha na conexão");
+          })
+          .finally(() => {
+            stopBusy();
+          });
       }, loginOptions) as Promise<unknown> | void;
 
       if (pending && typeof pending.then === "function") {
