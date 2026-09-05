@@ -156,33 +156,57 @@ export function useEmbeddedSignup(
       if (!window.FB || !sdkReady) {
         throw new Error("Login da Meta ainda carregando.");
       }
-      window.FB.login(
-        async (response) => {
-          try {
-            const code = response.authResponse?.code;
-            if (!code) {
-              throw new Error(
-                "A Meta fechou o login sem permissão de WhatsApp. No app: Facebook Login for Business → Configurations → Create from template → WhatsApp Embedded Signup. Cole o Configuration ID em NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID (local e Vercel) e reinicie o app.",
-              );
-            }
-            await finishSignup(code);
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Falha na conexão");
-          } finally {
-            setBusy(false);
+
+      const loginOptions = {
+        config_id: configId,
+        response_type: "code",
+        override_default_response_type: true,
+        fedCM: false,
+        extras: {
+          setup: {},
+          sessionInfoVersion: 3,
+        },
+      };
+
+      let finished = false;
+      const stopBusy = () => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(stuckTimer);
+        setBusy(false);
+      };
+
+      const stuckTimer = window.setTimeout(() => {
+        stopBusy();
+        setError(
+          "O login da Meta não abriu. À esquerda da barra do Chrome, permite popups e o início de sessão de terceiros neste site. Depois clica de novo.",
+        );
+      }, 15000);
+
+      const pending = window.FB.login(async (response) => {
+        try {
+          const code = response.authResponse?.code;
+          if (!code) {
+            throw new Error(
+              "A Meta fechou o login sem permissão de WhatsApp. Permite popups neste site e confirma o Configuration ID.",
+            );
           }
-        },
-        {
-          config_id: configId,
-          response_type: "code",
-          override_default_response_type: true,
-          fedCM: false,
-          extras: {
-            setup: {},
-            sessionInfoVersion: 3,
-          },
-        },
-      );
+          await finishSignup(code);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Falha na conexão");
+        } finally {
+          stopBusy();
+        }
+      }, loginOptions) as Promise<unknown> | void;
+
+      if (pending && typeof pending.then === "function") {
+        pending.catch(() => {
+          stopBusy();
+          setError(
+            "O Chrome bloqueou o login da Meta. Clica no ícone à esquerda do URL, permite início de sessão de terceiros e popups, e tenta de novo.",
+          );
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha na conexão");
       setBusy(false);
