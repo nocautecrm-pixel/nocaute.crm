@@ -18,6 +18,7 @@ const groups = {
     "NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID",
     "META_APP_ID",
     "META_APP_SECRET",
+    "META_EMBEDDED_SIGNUP_CONFIG_ID",
   ],
   "Worker (Railway)": [
     "REDIS_URL",

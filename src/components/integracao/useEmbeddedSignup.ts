@@ -62,8 +62,8 @@ export function useEmbeddedSignup(
     label: connection.label,
   });
 
-  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-  const configId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID;
+  const appId = process.env.NEXT_PUBLIC_META_APP_ID?.trim();
+  const configId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID?.trim();
   const officialLoginReady = Boolean(appId && configId);
 
   useEffect(() => {
@@ -81,9 +81,12 @@ export function useEmbeddedSignup(
     if (sdkInited.current || !appId || !window.FB) return;
     window.FB.init({
       appId,
+      cookie: true,
       autoLogAppEvents: true,
       xfbml: true,
       version: process.env.NEXT_PUBLIC_META_GRAPH_VERSION ?? "v21.0",
+      // Chrome FedCM abre login consumer (openid) e ignora config_id do Embedded Signup.
+      fedCM: false,
     });
     sdkInited.current = true;
     setSdkReady(true);
@@ -157,7 +160,11 @@ export function useEmbeddedSignup(
         async (response) => {
           try {
             const code = response.authResponse?.code;
-            if (!code) throw new Error("Conexão cancelada.");
+            if (!code) {
+              throw new Error(
+                "A Meta fechou o login sem permissão de WhatsApp. No app: Facebook Login for Business → Configurations → Create from template → WhatsApp Embedded Signup. Cole o Configuration ID em NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID (local e Vercel) e reinicie o app.",
+              );
+            }
             await finishSignup(code);
           } catch (err) {
             setError(err instanceof Error ? err.message : "Falha na conexão");
@@ -169,10 +176,10 @@ export function useEmbeddedSignup(
           config_id: configId,
           response_type: "code",
           override_default_response_type: true,
+          fedCM: false,
           extras: {
             setup: {},
-            featureType: "",
-            sessionInfoVersion: "3",
+            sessionInfoVersion: 3,
           },
         },
       );
