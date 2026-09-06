@@ -76,8 +76,9 @@ export function FirstStepOnboarding({
       </ol>
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-        Use o número da loja, não um chip de teste. Depois do login, abra o WhatsApp do celular da
-        casa: se as conversas sumirem, o número não está em coexistência na Meta.
+        Liga o WhatsApp Business que a loja já usa no celular (coexistência). No popup da Meta,
+        escolhe conectar o app existente e segue o QR — não cries número novo nem desligues o
+        WhatsApp do telemóvel.
       </p>
 
       <button

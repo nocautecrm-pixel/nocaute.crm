@@ -109,6 +109,7 @@ export function useEmbeddedSignup(
           setError(data.data?.error_message ?? "Erro no Embedded Signup.");
           return;
         }
+        // FINISH e FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING (coexistência) trazem os IDs.
         session.current = {
           wabaId: data.data?.waba_id ?? data.data?.wabaId,
           phoneNumberId: data.data?.phone_number_id ?? data.data?.phoneNumberId,
@@ -164,7 +165,10 @@ export function useEmbeddedSignup(
         fedCM: false,
         extras: {
           setup: {},
-          sessionInfoVersion: 3,
+          // Coexistência: lojista liga o WhatsApp Business do telemóvel (mesmo número) à Cloud API.
+          // Docs: developers.facebook.com/docs/whatsapp/embedded-signup/custom-flows/onboarding-business-app-users
+          featureType: "whatsapp_business_app_onboarding",
+          sessionInfoVersion: "3",
         },
       };
 
