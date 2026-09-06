@@ -19,7 +19,7 @@ export default async function ConfiguracoesPage() {
             step={1}
             title="Loja"
             done={storeReady}
-            doneLabel="Loja · etapa realizada"
+            doneLabel="Loja etapa realizada"
             pendingHint="Preenche e salva o perfil da casa"
           />
           <StoreProfileForm
@@ -37,7 +37,7 @@ export default async function ConfiguracoesPage() {
             step={2}
             title="WhatsApp Meta"
             done={connected}
-            doneLabel="WhatsApp Meta · etapa realizada"
+            doneLabel="WhatsApp Meta etapa realizada"
             pendingHint="Popup da Meta · QR no celular"
           />
           <WhatsAppConnectPanel connection={store.whatsapp} />
