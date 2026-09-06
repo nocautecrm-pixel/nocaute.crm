@@ -328,7 +328,7 @@ export function CustomerBoard({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <ListFreshnessBar freshness={listFreshness} />
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+      <div className="flex shrink-0 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <FilterChip href="/clientes" active={!publico} label="Todos" />
           {audienceRows.map((audience) => (
@@ -375,22 +375,27 @@ export function CustomerBoard({
             Novo público
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <CustomerImport onImported={handleImported} />
-          {rows.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => void onDeleteAll()}
-              disabled={saving}
-              className={`${btnSecondaryClass} text-red-600`}
-            >
-              Excluir lista
-            </button>
-          ) : null}
-          <button type="button" onClick={openCreate} className={btnPrimaryClass}>
-            Adicionar cliente
-          </button>
-        </div>
+
+        <CustomerImport
+          onImported={handleImported}
+          trailingActions={
+            <>
+              {rows.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void onDeleteAll()}
+                  disabled={saving}
+                  className={`${btnSecondaryClass} shrink-0 text-red-600`}
+                >
+                  Excluir lista
+                </button>
+              ) : null}
+              <button type="button" onClick={openCreate} className={`${btnPrimaryClass} shrink-0`}>
+                Adicionar cliente
+              </button>
+            </>
+          }
+        />
       </div>
 
       {demo ? (

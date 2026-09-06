@@ -1,11 +1,12 @@
 import { detectImportKind } from "@/lib/customers/import-agent/detect";
 import { extractCustomersFromLooseText } from "@/lib/customers/import-agent/loose-text";
 import {
-  bytesToBase64,
   extractCustomersWithAiText,
   extractCustomersWithAiVision,
   isImportAiReady,
+  bytesToBase64,
 } from "@/lib/customers/import-agent/llm";
+import { extractPdfLayoutText } from "@/lib/customers/import-agent/pdf-layout";
 import { extractPdfPlainText } from "@/lib/customers/import-agent/pdf-text";
 import { pickBestCandidate, toCandidate } from "@/lib/customers/import-agent/score";
 import type { ImportAgentResult, ImportCandidate } from "@/lib/customers/import-agent/types";
@@ -39,15 +40,23 @@ function previewLabel(result: ImportAgentResult) {
     planilha: "planilha (Excel)",
     texto_estruturado: "texto/CSV estruturado",
     texto_livre: "texto livre (caçou telefones)",
-    pdf_texto: "PDF (texto + interpretação)",
+    pdf_texto: "PDF (layout + interpretação)",
     ia_texto: "IA no texto do ficheiro",
     ia_visao: "IA visual (imagem/scan)",
   };
   return `${methodLabels[result.method] ?? result.method} · ${result.rows.length} contacto(s) · confiança ${result.confidence}`;
 }
 
+function boost(candidate: ImportCandidate | null, extra: number): ImportCandidate | null {
+  if (!candidate) return null;
+  return {
+    ...candidate,
+    confidence: Math.min(99, candidate.confidence + extra),
+  };
+}
+
 async function tryAiText(text: string, notes: string[]): Promise<ImportCandidate | null> {
-  if (!isImportAiReady() || text.trim().length < 20) return null;
+  if (!isImportAiReady() || text.trim().length < 12) return null;
   try {
     const parsed = await extractCustomersWithAiText(text);
     return toCandidate("ia_texto", parsed, ["Interpretação por IA no conteúdo textual."]);
@@ -75,6 +84,17 @@ async function tryAiVision(input: {
     input.notes.push(error instanceof Error ? error.message : "IA visão falhou.");
     return null;
   }
+}
+
+function pickForPdf(candidates: ImportCandidate[]): ImportCandidate | null {
+  const usable = candidates.filter((item) => item.rows.length > 0);
+  if (usable.length === 0) return null;
+  // Em PDF, preferir IA quando existir — o layout visual/textual costuma vencer o parser cego.
+  const ai = usable
+    .filter((item) => item.method === "ia_texto" || item.method === "ia_visao")
+    .sort((a, b) => b.rows.length - a.rows.length || b.confidence - a.confidence)[0];
+  if (ai && ai.rows.length >= 1) return ai;
+  return pickBestCandidate(usable);
 }
 
 /**
@@ -107,8 +127,9 @@ export async function runCustomerImportAgent(input: {
       if (parsed) push(toCandidate("planilha", parsed, ["Lido como Excel/OpenXML."]));
       const asText = grid.map((row) => row.join("\t")).join("\n");
       push(toCandidate("texto_livre", extractCustomersFromLooseText(asText)));
-      const ai = await tryAiText(asText, notes);
-      push(ai);
+      if (!parsed || parsed.rows.length < 3 || parsed.invalid > parsed.rows.length) {
+        push(await tryAiText(asText, notes));
+      }
     } catch (error) {
       notes.push(error instanceof Error ? error.message : "Falha ao abrir planilha.");
     }
@@ -130,35 +151,55 @@ export async function runCustomerImportAgent(input: {
 
   if (kind === "pdf") {
     try {
-      const { text, pages } = await extractPdfPlainText(input.bytes);
-      notes.push(`PDF com ${pages} página(s).`);
-      if (text.length >= 12) {
-        const grid = textToGrid(text);
+      let layoutText = "";
+      let pages = 0;
+      try {
+        const layout = await extractPdfLayoutText(input.bytes);
+        layoutText = layout.text;
+        pages = layout.pages;
+        notes.push(`PDF com ${pages} página(s) · layout por coordenadas.`);
+      } catch (layoutError) {
+        notes.push(
+          layoutError instanceof Error
+            ? `Layout PDF: ${layoutError.message}`
+            : "Layout PDF falhou.",
+        );
+      }
+
+      if (!layoutText || layoutText.length < 12) {
+        const plain = await extractPdfPlainText(input.bytes);
+        pages = plain.pages;
+        layoutText = plain.text;
+        notes.push(`PDF fallback texto simples · ${pages} página(s).`);
+      }
+
+      if (layoutText.length >= 12) {
+        const grid = textToGrid(layoutText.replace(/\t/g, ";"));
         const structured = safeGridParse(grid, notes);
         if (structured) {
-          push(toCandidate("pdf_texto", structured, ["PDF com texto tabular."]));
+          push(toCandidate("pdf_texto", structured, ["PDF reconstruído em colunas."]));
         }
-        push(toCandidate("texto_livre", extractCustomersFromLooseText(text), ["PDF lido em texto livre."]));
-        const bestSoFar = pickBestCandidate(candidates);
-        if (!bestSoFar || bestSoFar.confidence < 50) {
-          push(await tryAiText(text, notes));
-        }
+        push(
+          toCandidate("texto_livre", extractCustomersFromLooseText(layoutText), [
+            "PDF: caça a telefones no layout.",
+          ]),
+        );
+        // Sempre tenta IA no PDF (texto de layout) — é o que mais acerta export feio.
+        push(boost(await tryAiText(layoutText, notes), 22));
       } else {
         notes.push("PDF quase sem texto (possível scan).");
-        if (isImportAiReady()) {
-          // Sem render de página no serverless: pede foto OU usa IA no pouco texto.
-          push(await tryAiText(text || "PDF scan sem texto extraível.", notes));
-          notes.push(
-            "Scan: para melhor leitura, envie também um print/foto da lista ou um CSV do cardápio digital.",
-          );
-        } else {
+        if (!isImportAiReady()) {
           throw new Error(
-            "Este PDF parece digitalizado (sem texto). Envie CSV/Excel, ou configure OPENAI_API_KEY e envie um print da lista.",
+            "Este PDF parece digitalizado (sem texto). Configure OPENAI_API_KEY e envie de novo, ou mande um print/CSV da lista.",
           );
         }
+        push(boost(await tryAiText("PDF scan sem texto extraível.", notes), 10));
+        notes.push("Sem texto no PDF: envie também um print da lista para a IA visual.");
       }
     } catch (error) {
-      if (error instanceof Error && error.message.includes("digitalizado")) throw error;
+      if (error instanceof Error && (error.message.includes("digitalizado") || error.message.includes("40 páginas"))) {
+        throw error;
+      }
       notes.push(error instanceof Error ? error.message : "Falha ao ler PDF.");
       if (isImportAiReady()) {
         push(await tryAiText(decodeText(input.bytes).slice(0, 4000), notes));
@@ -188,12 +229,16 @@ export async function runCustomerImportAgent(input: {
     );
   }
 
-  const best = pickBestCandidate(candidates);
+  const best = kind === "pdf" ? pickForPdf(candidates) : pickBestCandidate(candidates);
   if (!best) {
     const hint = notes.filter(Boolean).slice(0, 3).join(" ");
+    const aiHint = !isImportAiReady()
+      ? " Sem OPENAI_API_KEY a leitura de PDF difícil fica limitada — configure na Vercel."
+      : "";
     throw new Error(
-      hint ||
-        "Não consegui interpretar clientes (nome + WhatsApp) neste ficheiro. Tente CSV, Excel, PDF com texto ou um print com IA configurada.",
+      (hint ||
+        "Não consegui interpretar clientes (nome + WhatsApp) neste ficheiro. Tente CSV, Excel, PDF ou um print.") +
+        aiHint,
     );
   }
 

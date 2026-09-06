@@ -101,9 +101,11 @@ function extractJsonObject(text: string): unknown {
 }
 
 const SYSTEM_PROMPT = `És um agent de importação de base de CLIENTES de restaurante (WhatsApp CRM).
-Extrai só pessoas com telefone. Ignora itens de cardápio, preços, CNPJ, endereço da loja, cabeçalhos e rodapés.
+Extrai só pessoas com telefone (WhatsApp/celular). Ignora itens de cardápio, preços, CNPJ, endereço da loja, cabeçalhos e rodapés.
+O texto pode vir de PDF com colunas separadas por TAB — trata cada linha como possível registo (nome + telefone na mesma linha ou em colunas vizinhas).
 Se o ficheiro for cardápio de produtos (pratos/preços sem telefones de clientes), devolve customers: [].
 Telefones brasileiros: preserve DDD; normaliza mentalmente para E.164 (+55...).
+Não inventes telefones. Se o nome estiver partido em colunas, junta.
 Responde APENAS JSON:
 {"documentType":"customers"|"menu"|"mixed"|"unknown","customers":[{"name":"...","phone":"...","lastPurchaseAt":null,"daysAgo":null,"orderCount":null,"optIn":false,"optInSource":null,"optInProof":null}]}`;
 

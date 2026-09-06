@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { btnPrimaryClass, btnSecondaryClass } from "@/components/ui/tokens";
 import type { AudienceWithCount } from "@/lib/audiences/types";
 import type { ListFreshness } from "@/lib/customers/list-freshness";
@@ -27,8 +27,11 @@ type AnalyzePayload = {
 
 export function CustomerImport({
   onImported,
+  trailingActions,
 }: {
   onImported?: (snapshot: CustomerBoardSnapshot) => void | Promise<void>;
+  /** Botões na mesma linha do Importar (Excluir / Adicionar). */
+  trailingActions?: ReactNode;
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,7 +69,7 @@ export function CustomerImport({
         rejected: payload.rejected ?? [],
         rows,
       });
-      setStatus(`Pré-visualização pronta. Confirme para gravar na base.`);
+      setStatus("Pré-visualização pronta. Confirme para gravar na base.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Falha na leitura inteligente");
     } finally {
@@ -109,10 +112,10 @@ export function CustomerImport({
   }
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <label className={`${btnSecondaryClass} cursor-pointer`}>
-          {loading ? "A interpretar…" : "Importar base (qualquer formato)"}
+        <label className={`${btnSecondaryClass} cursor-pointer shrink-0`}>
+          {loading ? "A interpretar…" : "Importar base"}
           <input
             type="file"
             accept=".csv,.tsv,.txt,.xlsx,.xls,.pdf,.png,.jpg,.jpeg,.webp,text/csv,text/plain,application/pdf,image/png,image/jpeg,image/webp,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -124,17 +127,14 @@ export function CustomerImport({
             }}
           />
         </label>
+        {trailingActions}
         <a
           href="/modelos/clientes.csv"
           download
-          className="text-sm font-medium text-emerald-700 hover:underline"
+          className="shrink-0 text-xs font-medium text-emerald-700 hover:underline"
         >
-          Modelo CSV (opcional)
+          Modelo CSV
         </a>
-        <p className="max-w-[360px] text-xs text-[#667781]">
-          CSV, Excel, PDF ou print. O agent escolhe sozinho a melhor leitura; você confirma antes de
-          gravar.
-        </p>
       </div>
 
       {preview ? (
@@ -199,7 +199,7 @@ export function CustomerImport({
         </div>
       ) : null}
 
-      {status ? <p className="max-w-[520px] text-xs text-[#667781]">{status}</p> : null}
+      {status ? <p className="max-w-[640px] text-xs text-[#667781]">{status}</p> : null}
     </div>
   );
 }
