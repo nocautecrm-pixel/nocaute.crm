@@ -29,7 +29,7 @@ export default async function ConfiguracoesPage() {
 
         <section className="flex min-h-0 flex-col lg:h-full">
           <p className="mb-2 shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-[#667781]">
-            2 · Login Meta {connected ? "✓" : ""}
+            2 · WhatsApp Meta {connected ? "✓" : ""}
           </p>
           <WhatsAppConnectPanel connection={store.whatsapp} />
         </section>
@@ -52,7 +52,8 @@ export default async function ConfiguracoesPage() {
                 </>
               ) : (
                 <p className="text-sm text-[#667781]">
-                  Conecte no passo 2. O número da loja aparece aqui depois do login.
+                  No passo 2 abre o popup da Meta (QR no celular). O número da loja aparece aqui
+                  depois.
                 </p>
               )}
             </div>

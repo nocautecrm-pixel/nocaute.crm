@@ -64,6 +64,11 @@ export function WhatsAppConnectPanel({
             </div>
           </dl>
 
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+            Número errado ou teste (+1 555)? Reconecta e no popup escolhe o WhatsApp Business do
+            celular (QR), não “adicionar número novo”.
+          </p>
+
           <button
             type="button"
             onClick={signup.connect}

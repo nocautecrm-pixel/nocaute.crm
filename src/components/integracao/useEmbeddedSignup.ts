@@ -191,7 +191,7 @@ export function useEmbeddedSignup(
         const code = response.authResponse?.code;
         if (!code) {
           setError(
-            "A Meta fechou o login sem permissão de WhatsApp. Permite popups neste site e confirma o Configuration ID.",
+            "A Meta fechou sem concluir. No popup: escolhe o WhatsApp Business do celular (coexistência) e o QR — não “número novo” nem “só nome de exibição”.",
           );
           stopBusy();
           return;

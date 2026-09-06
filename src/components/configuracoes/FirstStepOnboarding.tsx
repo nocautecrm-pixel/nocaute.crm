@@ -1,13 +1,25 @@
 "use client";
 
-import { BadgeCheck, KeyRound, Smartphone } from "lucide-react";
+import { QrCode, Smartphone, Store } from "lucide-react";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { btnPrimaryClass, cardClass, eyebrowClass } from "@/components/ui/tokens";
 
-const STEPS = [
-  { icon: Smartphone, title: "Número da loja", hint: "O mesmo do atendimento." },
-  { icon: KeyRound, title: "Login da Meta", hint: "Abre a conta oficial da loja." },
-  { icon: BadgeCheck, title: "Dados na ferramenta", hint: "Número e nome vêm da Meta." },
+const POPUP_STEPS = [
+  {
+    icon: Store,
+    title: "1. Conta da loja",
+    hint: "No popup: escolhe o portfólio da casa (Business).",
+  },
+  {
+    icon: Smartphone,
+    title: "2. WhatsApp do celular",
+    hint: "Escolhe ligar o app WhatsApp Business que já usa — não “número novo”.",
+  },
+  {
+    icon: QrCode,
+    title: "3. QR no telemóvel",
+    hint: "Abre o WhatsApp Business da loja e lê o QR. Conversas ficam no celular.",
+  },
 ] as const;
 
 export function FirstStepOnboarding({
@@ -29,7 +41,7 @@ export function FirstStepOnboarding({
         <div>
           <p className={`${eyebrowClass} text-emerald-700`}>WhatsApp oficial</p>
           <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-900">
-            Embedded Signup
+            Conectar a loja
           </h2>
         </div>
         <span
@@ -40,54 +52,54 @@ export function FirstStepOnboarding({
           }`}
         >
           <StatusDot tone={connected ? "live" : "pending"} />
-          {connected ? "Conectado" : "One-click"}
+          {connected ? "Conectado" : "Pelo popup"}
         </span>
       </div>
 
-      <ol className="mt-3 grid grid-cols-3 gap-2">
-        {STEPS.map((step, index) => {
+      <p className="mt-3 text-[12px] leading-relaxed text-slate-600">
+        Tudo acontece neste site: ao clicar, abre o popup da Meta. Não precisas de ir ao Business
+        Manager. Usa o <span className="font-semibold text-slate-800">mesmo número</span> do
+        atendimento.
+      </p>
+
+      <ol className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {POPUP_STEPS.map((step) => {
           const Icon = step.icon;
-          const done = connected || index === 0;
-          const current = !connected && index === 1;
           return (
             <li
               key={step.title}
-              className="rounded-lg border border-slate-200/70 bg-slate-50/60 px-2 py-2 text-center"
+              className="flex gap-2.5 rounded-lg border border-slate-200/70 bg-slate-50/60 px-2.5 py-2"
             >
-              <span
-                className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md border ${
-                  done
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : current
-                      ? "border-emerald-300 bg-white text-emerald-700"
-                      : "border-slate-200 bg-white text-slate-400"
-                }`}
-              >
-                {done && index !== 1 ? (
-                  <span className="text-[10px] font-bold">✓</span>
-                ) : (
-                  <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-                )}
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700">
+                <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
               </span>
-              <p className="mt-1.5 text-[11px] font-medium tracking-tight text-slate-900">{step.title}</p>
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold tracking-tight text-slate-900">{step.title}</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{step.hint}</p>
+              </div>
             </li>
           );
         })}
       </ol>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-        Liga o WhatsApp Business que a loja já usa no celular (coexistência). No popup da Meta,
-        escolhe conectar o app existente e segue o QR — não cries número novo nem desligues o
-        WhatsApp do telemóvel.
-      </p>
+      <ul className="mt-3 space-y-1 text-[11px] leading-snug text-slate-500">
+        <li>
+          <span className="font-semibold text-emerald-700">Faz:</span> QR + app WhatsApp Business da
+          loja (coexistência).
+        </li>
+        <li>
+          <span className="font-semibold text-red-600">Não faças:</span> “só nome de exibição”, criar
+          número novo, nem desligar o WhatsApp do telemóvel.
+        </li>
+      </ul>
 
       <button
         type="button"
         onClick={onConnect}
         disabled={connectDisabled}
-        className={`mt-auto w-full ${btnPrimaryClass}`}
+        className={`mt-3 w-full shrink-0 ${btnPrimaryClass}`}
       >
-        {connecting ? "Conectando…" : connectLabel}
+        {connecting ? "Abrindo a Meta…" : connectLabel}
       </button>
     </section>
   );
