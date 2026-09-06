@@ -1,14 +1,17 @@
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { DEMO_RESTAURANT_ID } from "@/lib/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { META_CONNECTED_LABEL } from "@/lib/whatsapp/constants";
+import {
+  META_CONNECTED_LABEL,
+  META_DISCONNECTED_LABEL,
+} from "@/lib/whatsapp/constants";
 import {
   exchangeEmbeddedSignupCode,
   resolveWhatsAppAssets,
 } from "@/lib/whatsapp/embedded-signup";
 import type { WhatsAppCredentials } from "@/lib/whatsapp/service";
 
-export { META_CONNECTED_LABEL };
+export { META_CONNECTED_LABEL, META_DISCONNECTED_LABEL };
 
 export async function completeEmbeddedSignup(input: {
   restaurantId: string;
@@ -60,6 +63,46 @@ export async function completeEmbeddedSignup(input: {
     wabaId: assets.wabaId,
     phoneNumberId: assets.phoneNumberId,
     label: META_CONNECTED_LABEL,
+  };
+}
+
+/** Derruba a ligação no Nocaute: token inválido, status disconnected. Não apaga o WhatsApp do telemóvel. */
+export async function disconnectWhatsAppAccount(restaurantId: string) {
+  if (!restaurantId || restaurantId === DEMO_RESTAURANT_ID) {
+    throw new Error("Loja não identificada.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) {
+    throw new Error("Supabase admin indisponível para desconectar o WhatsApp.");
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await admin
+    .from("whatsapp_accounts")
+    .update({
+      status: "disconnected",
+      access_token_encrypted: encryptSecret("REVOKED"),
+      display_phone: null,
+      verified_name: null,
+      quality_rating: null,
+      meta_user_id: null,
+      last_inbound_at: null,
+      updated_at: now,
+    })
+    .eq("restaurant_id", restaurantId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Nenhuma conta WhatsApp ligada a esta loja.");
+  }
+
+  return {
+    ok: true as const,
+    connected: false as const,
+    label: META_DISCONNECTED_LABEL,
   };
 }
 

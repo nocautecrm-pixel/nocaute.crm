@@ -13,6 +13,9 @@ export const btnPrimaryClass =
 export const btnSecondaryClass =
   "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#E9EDEF] bg-white px-4 text-sm font-medium text-[#111B21] transition-all duration-150 hover:bg-[#F0F2F5] disabled:cursor-not-allowed disabled:opacity-50";
 
+export const btnDangerClass =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition-all duration-150 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
+
 export const labelClass = "block space-y-1.5 text-sm";
 export const labelTextClass = "font-medium text-[#667781]";
 export const eyebrowClass =

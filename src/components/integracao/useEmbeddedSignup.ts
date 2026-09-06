@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { META_CONNECTED_LABEL } from "@/lib/whatsapp/constants";
+import { META_CONNECTED_LABEL, META_DISCONNECTED_LABEL } from "@/lib/whatsapp/constants";
 import type { WhatsAppConnection } from "@/types/store";
 
 type FbLoginResponse = {
@@ -53,6 +53,7 @@ export function useEmbeddedSignup(
   const [busy, setBusy] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [account, setAccount] = useState({
     connected: connection.connected,
     displayPhone: connection.displayPhone,
@@ -147,6 +148,30 @@ export function useEmbeddedSignup(
     onConnected?.();
   }
 
+  async function disconnect() {
+    setDisconnecting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/meta/disconnect", { method: "POST" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Não foi possível desconectar");
+
+      setAccount({
+        connected: false,
+        displayPhone: null,
+        verifiedName: null,
+        wabaId: null,
+        phoneNumberId: null,
+        label: META_DISCONNECTED_LABEL,
+      });
+      onConnected?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao desconectar");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
   async function connect() {
     setBusy(true);
     setError(null);
@@ -221,7 +246,9 @@ export function useEmbeddedSignup(
   }
 
   const connected = account.connected;
-  const connectDisabled = busy || !officialLoginReady || (officialLoginReady && !sdkReady);
+  const connectDisabled =
+    busy || disconnecting || !officialLoginReady || (officialLoginReady && !sdkReady);
+  const disconnectDisabled = busy || disconnecting;
   const connectLabel = busy
     ? "Conectando…"
     : !officialLoginReady
@@ -235,12 +262,15 @@ export function useEmbeddedSignup(
   return {
     account,
     busy,
+    disconnecting,
     error,
     connected,
     connectDisabled,
+    disconnectDisabled,
     connectLabel,
     officialLoginReady,
     initFacebookSdk,
     connect,
+    disconnect,
   };
 }

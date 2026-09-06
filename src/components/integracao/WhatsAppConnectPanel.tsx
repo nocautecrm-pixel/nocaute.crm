@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { FirstStepOnboarding } from "@/components/configuracoes/FirstStepOnboarding";
 import { useEmbeddedSignup } from "@/components/integracao/useEmbeddedSignup";
 import { StatusDot } from "@/components/ui/StatusDot";
-import { btnSecondaryClass, cardClass, eyebrowClass, insetClass } from "@/components/ui/tokens";
+import {
+  btnDangerClass,
+  btnSecondaryClass,
+  cardClass,
+  eyebrowClass,
+  insetClass,
+} from "@/components/ui/tokens";
 import { formatWhatsAppPhone } from "@/lib/whatsapp/display";
 import type { WhatsAppConnection } from "@/types/store";
 
@@ -21,6 +27,14 @@ export function WhatsAppConnectPanel({
     onConnected?.();
     router.refresh();
   });
+
+  function confirmDisconnect() {
+    const ok = window.confirm(
+      "Desligar o WhatsApp desta loja no Nocaute?\n\nO telemóvel continua com o WhatsApp Business. Só a ferramenta deixa de enviar campanhas até voltares a conectar.",
+    );
+    if (!ok) return;
+    void signup.disconnect();
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
@@ -69,14 +83,24 @@ export function WhatsAppConnectPanel({
             celular (QR), não “adicionar número novo”.
           </p>
 
-          <button
-            type="button"
-            onClick={signup.connect}
-            disabled={signup.connectDisabled}
-            className={`mt-auto ${btnSecondaryClass} w-full`}
-          >
-            {signup.connectLabel}
-          </button>
+          <div className="mt-auto flex flex-col gap-2 pt-3">
+            <button
+              type="button"
+              onClick={signup.connect}
+              disabled={signup.connectDisabled}
+              className={`${btnSecondaryClass} w-full`}
+            >
+              {signup.connectLabel}
+            </button>
+            <button
+              type="button"
+              onClick={confirmDisconnect}
+              disabled={signup.disconnectDisabled}
+              className={`${btnDangerClass} w-full`}
+            >
+              {signup.disconnecting ? "A desligar…" : "Desligar WhatsApp da ferramenta"}
+            </button>
+          </div>
         </section>
       ) : (
         <FirstStepOnboarding
