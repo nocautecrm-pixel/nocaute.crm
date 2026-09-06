@@ -138,8 +138,8 @@ export function CustomerImport({
         </a>
       </div>
       <p className="text-[11px] text-[#667781]">
-        Excel: Nome do Cliente, Número Telefone, Número Whatsapp, Quantidade de Pedidos. PDF: etapa
-        própria.
+        Deteta o cardápio digital (Excel/PDF Clientes em potencial) e lê nome, WhatsApp, pedidos e
+        dias.
       </p>
 
       {preview ? (
