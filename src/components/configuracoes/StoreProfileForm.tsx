@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StoreLogo } from "@/components/dashboard/StoreLogo";
 import {
+  btnDangerClass,
   btnPrimaryClass,
   btnSecondaryClass,
   cardClass,
@@ -55,9 +56,11 @@ export function StoreProfileForm({
   const [logo, setLogo] = useState<string | null>(logoUrl);
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const lastStep = STEPS.length - 1;
   const current = STEPS[step];
+  const canDisconnect = name.trim().length >= 2;
 
   useEffect(() => {
     setLogo(logoUrl);
@@ -140,6 +143,37 @@ export function StoreProfileForm({
       setStatus(error instanceof Error ? error.message : "Erro ao salvar");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function confirmDisconnect() {
+    const ok = window.confirm(
+      "Desligar o perfil desta loja no Nocaute?\n\nNome, logo, cardápio, endereço e horário são limpos. A conta continua; a etapa 1 volta a pendente até voltares a salvar.",
+    );
+    if (!ok) return;
+    void clearProfile();
+  }
+
+  async function clearProfile() {
+    setClearing(true);
+    setStatus(null);
+    try {
+      const response = await fetch("/api/store/profile/clear", { method: "POST" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Não foi possível desligar o perfil");
+      setStoreName("");
+      setStoreCity("");
+      setMenu("");
+      setAddr("");
+      setHours("");
+      setLogo(null);
+      setStep(0);
+      setStatus("Perfil da loja desligado.");
+      router.refresh();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Erro ao desligar o perfil");
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -256,22 +290,39 @@ export function StoreProfileForm({
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
-            {step > 0 ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              {step > 0 ? (
+                <button
+                  type="button"
+                  className={btnSecondaryClass}
+                  disabled={clearing}
+                  onClick={() => {
+                    setStatus(null);
+                    setStep((value) => Math.max(0, value - 1));
+                  }}
+                >
+                  Voltar
+                </button>
+              ) : null}
+              <button
+                type="submit"
+                disabled={saving || clearing}
+                className={`min-w-0 flex-1 ${btnPrimaryClass}`}
+              >
+                {saving ? "Salvando…" : step < lastStep ? "Continuar" : "Salvar loja"}
+              </button>
+            </div>
+            {canDisconnect ? (
               <button
                 type="button"
-                className={btnSecondaryClass}
-                onClick={() => {
-                  setStatus(null);
-                  setStep((value) => Math.max(0, value - 1));
-                }}
+                onClick={confirmDisconnect}
+                disabled={saving || clearing}
+                className={`${btnDangerClass} w-full`}
               >
-                Voltar
+                {clearing ? "A desligar…" : "Desligar perfil da loja"}
               </button>
             ) : null}
-            <button type="submit" disabled={saving} className={`min-w-0 flex-1 ${btnPrimaryClass}`}>
-              {saving ? "Salvando…" : step < lastStep ? "Continuar" : "Salvar loja"}
-            </button>
           </div>
           {status ? <p className="mt-2 text-sm text-slate-500">{status}</p> : null}
         </div>

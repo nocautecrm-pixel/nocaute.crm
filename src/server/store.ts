@@ -30,26 +30,28 @@ import type { StorePanel } from "@/types/store";
 
 export async function getStorePanel(): Promise<StorePanel> {
   const jar = await cookies();
-  const cookieName = jar.get("store_name")?.value?.trim();
-  const cookieCity = jar.get("store_city")?.value?.trim();
   const demoConnected = jar.get(DEMO_WHATSAPP_COOKIE)?.value === "1";
 
   if (isDemoMode()) {
     const quota = await getQuotaSnapshot(DEMO_RESTAURANT_ID);
+    const nameCookie = jar.get("store_name");
+    const cityCookie = jar.get("store_city");
     const cookieLogo = jar.get("store_logo_url")?.value?.trim();
     const cookieMenu = jar.get("store_menu_url")?.value?.trim();
     const cookieAddress = jar.get("store_address")?.value?.trim();
     const cookieHours = jar.get("store_hours_text")?.value?.trim();
+    const profileCleared = nameCookie !== undefined && !nameCookie.value.trim();
     return {
       ...withDemoWhatsAppConnection(
         {
           ...DEMO_STORE,
-          storeName: cookieName || DEMO_STORE.storeName,
-          city: cookieCity || DEMO_STORE.city,
-          logoUrl: cookieLogo || DEMO_STORE.logoUrl,
-          menuUrl: cookieMenu || DEMO_STORE.menuUrl,
-          address: cookieAddress || DEMO_STORE.address,
-          hoursText: cookieHours || DEMO_STORE.hoursText,
+          // Cookie presente (mesmo vazio) = perfil gravado/limpo; sem cookie = demo padrão.
+          storeName: nameCookie ? nameCookie.value : DEMO_STORE.storeName,
+          city: cityCookie ? cityCookie.value : DEMO_STORE.city,
+          logoUrl: profileCleared ? null : cookieLogo || DEMO_STORE.logoUrl,
+          menuUrl: profileCleared ? "" : cookieMenu || DEMO_STORE.menuUrl,
+          address: profileCleared ? "" : cookieAddress || DEMO_STORE.address,
+          hoursText: profileCleared ? "" : cookieHours || DEMO_STORE.hoursText,
         },
         demoConnected,
       ),
@@ -82,7 +84,8 @@ export async function getStorePanel(): Promise<StorePanel> {
 
   const connected = account?.status === "connected";
   const window = customerCareWindow(account?.last_inbound_at ?? null);
-  const storeName = restaurant?.name || DEMO_STORE.productName;
+  // Sem fallback de marca: nome vazio = etapa 1 incompleta (após “desligar perfil”).
+  const storeName = restaurant?.name ?? "";
 
   return {
     productName: DEMO_STORE.productName,
@@ -168,6 +171,41 @@ export async function saveStoreProfile(input: {
       menu_url: input.menuUrl?.trim() || null,
       address: input.address?.trim() || null,
       hours_text: input.hoursText?.trim() || null,
+    })
+    .eq("id", restaurantId);
+
+  if (error) throw error;
+  return { ok: true as const, demo: false as const };
+}
+
+/** Limpa o perfil da loja no Nocaute (etapa 1 volta a pendente). Não apaga a conta. */
+export async function clearStoreProfile() {
+  if (isDemoMode()) {
+    const jar = await cookies();
+    jar.set("store_name", "", { path: "/", sameSite: "lax" });
+    jar.set("store_city", "", { path: "/", sameSite: "lax" });
+    jar.set("store_menu_url", "", { path: "/", sameSite: "lax" });
+    jar.set("store_address", "", { path: "/", sameSite: "lax" });
+    jar.set("store_hours_text", "", { path: "/", sameSite: "lax" });
+    jar.set("store_logo_url", "", { path: "/", sameSite: "lax" });
+    return { ok: true as const, demo: true as const };
+  }
+
+  requireLiveBackend();
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) throw new BackendUnavailableError();
+
+  const restaurantId = await getCurrentRestaurantId();
+  const { error } = await admin
+    .from("restaurants")
+    .update({
+      name: "",
+      city: "",
+      menu_url: null,
+      address: null,
+      hours_text: null,
+      logo_url: null,
     })
     .eq("id", restaurantId);
 
