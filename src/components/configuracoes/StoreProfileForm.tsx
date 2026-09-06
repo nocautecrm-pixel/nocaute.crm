@@ -144,7 +144,7 @@ export function StoreProfileForm({
     <section className={`${cardClass} flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4`}>
       <div className="shrink-0">
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#667781]">
-          Etapa {step + 1} de {STEPS.length}
+          Dentro da etapa Loja · {step + 1} de {STEPS.length}
         </p>
         <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-900">{current.title}</h2>
         <p className="mt-0.5 text-sm text-slate-500">{current.hint}</p>
