@@ -30,13 +30,16 @@ export async function POST(request: NextRequest) {
       const result = await importCustomers(restaurantId, rows);
       const board = await getCustomerBoard(restaurantId);
       revalidateCustomerPaths();
-      return NextResponse.json({
-        ok: true,
-        imported: result.imported,
-        updated: result.updated,
-        invalid: result.invalid,
-        ...board,
-      });
+      return NextResponse.json(
+        {
+          ok: true,
+          imported: result.imported,
+          updated: result.updated,
+          invalid: result.invalid,
+          ...board,
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     }
 
     const form = await request.formData();

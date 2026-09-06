@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CustomerImport, type CustomerBoardSnapshot } from "@/components/clientes/CustomerImport";
 import { StatusDot } from "@/components/ui/StatusDot";
 import {
@@ -89,10 +89,23 @@ export function CustomerBoard({
   const [audienceStatus, setAudienceStatus] = useState<string | null>(null);
   const [audienceSaving, setAudienceSaving] = useState(false);
 
+  // RSC/revalidate pode remountar com props novas — mantém a lista alinhada sem F5.
+  useEffect(() => {
+    setRows(customers);
+  }, [customers]);
+
+  useEffect(() => {
+    setAudienceRows(audiences);
+  }, [audiences]);
+
+  useEffect(() => {
+    setListFreshness(freshness);
+  }, [freshness]);
+
   function applyBoard(snapshot: CustomerBoardSnapshot) {
-    if (snapshot.customers) setRows(snapshot.customers);
-    if (snapshot.audiences) setAudienceRows(snapshot.audiences);
-    if (snapshot.freshness) setListFreshness(snapshot.freshness);
+    if (snapshot.customers !== undefined) setRows(snapshot.customers);
+    if (snapshot.audiences !== undefined) setAudienceRows(snapshot.audiences);
+    if (snapshot.freshness !== undefined) setListFreshness(snapshot.freshness);
   }
 
   async function reloadBoard() {
@@ -100,6 +113,16 @@ export function CustomerBoard({
     const payload = (await response.json()) as CustomerBoardSnapshot & { error?: string };
     if (!response.ok) throw new Error(payload.error ?? "Não foi possível atualizar a lista");
     applyBoard(payload);
+  }
+
+  async function handleImported(snapshot: CustomerBoardSnapshot) {
+    applyBoard(snapshot);
+    try {
+      await reloadBoard();
+    } catch {
+      // Se o GET falhar, mantém o snapshot da resposta do import.
+    }
+    router.refresh();
   }
 
   const selectedAudience = audienceRows.find((audience) => audience.slug === publico);
@@ -214,7 +237,7 @@ export function CustomerBoard({
   async function onDeleteAll() {
     if (rows.length === 0) return;
     const ok = window.confirm(
-      `Apaga os ${rows.length} cliente(s) desta loja de uma vez. Não tem volta. Continuar?`,
+      `Apaga os ${rows.length} cliente(s) e todo rastro no banco (campanhas, cupons, eventos). Não tem volta. Continuar?`,
     );
     if (!ok) return;
     setSaving(true);
@@ -353,7 +376,7 @@ export function CustomerBoard({
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CustomerImport onImported={applyBoard} />
+          <CustomerImport onImported={handleImported} />
           {rows.length > 0 ? (
             <button
               type="button"

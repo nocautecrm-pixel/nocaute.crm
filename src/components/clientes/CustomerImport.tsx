@@ -28,7 +28,7 @@ type AnalyzePayload = {
 export function CustomerImport({
   onImported,
 }: {
-  onImported?: (snapshot: CustomerBoardSnapshot) => void;
+  onImported?: (snapshot: CustomerBoardSnapshot) => void | Promise<void>;
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -96,8 +96,8 @@ export function CustomerImport({
         `Novos ${payload.imported ?? 0}. Atualizados ${payload.updated ?? 0}. Inválidos ${payload.invalid ?? 0}.`,
       );
       setPreview(null);
-      onImported?.({
-        customers: payload.customers,
+      await onImported?.({
+        customers: payload.customers ?? [],
         audiences: payload.audiences,
         freshness: payload.freshness,
       });
