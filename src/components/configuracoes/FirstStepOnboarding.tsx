@@ -7,18 +7,18 @@ import { btnPrimaryClass, cardClass, eyebrowClass } from "@/components/ui/tokens
 const POPUP_STEPS = [
   {
     icon: Store,
-    title: "1. Conta da loja",
-    hint: "No popup: escolhe o portfólio da casa (Business).",
+    title: "1. Portfólio da loja",
+    hint: "Escolhe o Business da casa (ex.: Com Limão e Sal).",
   },
   {
     icon: Smartphone,
-    title: "2. WhatsApp do celular",
-    hint: "Escolhe ligar o app WhatsApp Business que já usa — não “número novo”.",
+    title: "2. Ligar o app do celular",
+    hint: "Tem de aparecer “conectar WhatsApp Business existente / app”. Não escolhas “adicionar número” nem a WABA vazia antiga.",
   },
   {
     icon: QrCode,
-    title: "3. QR no telemóvel",
-    hint: "Abre o WhatsApp Business da loja e lê o QR. Conversas ficam no celular.",
+    title: "3. QR no WhatsApp Business",
+    hint: "O telemóvel mostra QR ou pedido no app. Não pedimos SMS para “criar” o número — ele já existe.",
   },
 ] as const;
 
@@ -52,14 +52,14 @@ export function FirstStepOnboarding({
           }`}
         >
           <StatusDot tone={connected ? "live" : "pending"} />
-          {connected ? "Conectado" : "Pelo popup"}
+          {connected ? "Conectado" : "Coexistência"}
         </span>
       </div>
 
       <p className="mt-3 text-[12px] leading-relaxed text-slate-600">
-        Tudo acontece neste site: ao clicar, abre o popup da Meta. Não precisas de ir ao Business
-        Manager. Usa o <span className="font-semibold text-slate-800">mesmo número</span> do
-        atendimento.
+        O Nocaute <span className="font-semibold text-slate-800">não cria</span> um WhatsApp novo:
+        liga o que a loja já usa no celular à Cloud API (coexistência). Tudo no popup — sem abrir o
+        Business Manager.
       </p>
 
       <ol className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
@@ -82,16 +82,14 @@ export function FirstStepOnboarding({
         })}
       </ol>
 
-      <ul className="mt-3 space-y-1 text-[11px] leading-snug text-slate-500">
-        <li>
-          <span className="font-semibold text-emerald-700">Faz:</span> QR + app WhatsApp Business da
-          loja (coexistência).
-        </li>
-        <li>
-          <span className="font-semibold text-red-600">Não faças:</span> “só nome de exibição”, criar
-          número novo, nem desligar o WhatsApp do telemóvel.
-        </li>
-      </ul>
+      <div className="mt-3 rounded-lg border border-amber-200/80 bg-amber-50/70 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
+        <p className="font-semibold">Se pedir SMS / “número já registado”</p>
+        <p className="mt-0.5 text-amber-900/90">
+          Estás no caminho errado (criar do zero). Fecha, clica de novo e procura a opção de{" "}
+          <span className="font-semibold">app WhatsApp Business / QR</span>. SMS só serve para
+          número que ainda não está no WhatsApp.
+        </p>
+      </div>
 
       <button
         type="button"

@@ -165,9 +165,10 @@ export function useEmbeddedSignup(
         fedCM: false,
         extras: {
           setup: {},
-          // Coexistência: lojista liga o WhatsApp Business do telemóvel (mesmo número) à Cloud API.
-          // Docs: developers.facebook.com/docs/whatsapp/embedded-signup/custom-flows/onboarding-business-app-users
+          // Coexistência (ligar app do telemóvel). Meta exige Tech Provider + este featureType.
+          // Teste: a tela de WABA deve oferecer “conectar WhatsApp Business existente”, não só SMS.
           featureType: "whatsapp_business_app_onboarding",
+          feature_type: "whatsapp_business_app_onboarding",
           sessionInfoVersion: "3",
         },
       };
@@ -191,7 +192,7 @@ export function useEmbeddedSignup(
         const code = response.authResponse?.code;
         if (!code) {
           setError(
-            "A Meta fechou sem concluir. No popup: escolhe o WhatsApp Business do celular (coexistência) e o QR — não “número novo” nem “só nome de exibição”.",
+            "Popup fechou sem ligar. Se viste SMS ou “já registado”, era o fluxo errado — fecha e procura conectar o app WhatsApp Business (QR), não adicionar número.",
           );
           stopBusy();
           return;
