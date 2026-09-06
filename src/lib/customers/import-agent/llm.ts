@@ -100,14 +100,18 @@ function extractJsonObject(text: string): unknown {
   return JSON.parse(body.slice(start, end + 1)) as unknown;
 }
 
-const SYSTEM_PROMPT = `És um agent de importação de base de CLIENTES de restaurante (WhatsApp CRM).
-Extrai só pessoas com telefone (WhatsApp/celular). Ignora itens de cardápio, preços, CNPJ, endereço da loja, cabeçalhos e rodapés.
-O texto pode vir de PDF com colunas separadas por TAB — trata cada linha como possível registo (nome + telefone na mesma linha ou em colunas vizinhas).
-Se o ficheiro for cardápio de produtos (pratos/preços sem telefones de clientes), devolve customers: [].
-Telefones brasileiros: preserve DDD; normaliza mentalmente para E.164 (+55...).
-Não inventes telefones. Se o nome estiver partido em colunas, junta.
+const SYSTEM_PROMPT = `És um agent de importação de CLIENTES para CRM de restaurante (WhatsApp).
+Extrai UMA linha por pessoa. Campos:
+- name (nome do cliente)
+- phone (WhatsApp/celular com DDD)
+- orderCount (quantos pedidos já fez; número ou null)
+- daysAgo (há quantos dias não pede; número ou null)
+- lastPurchaseAt (data da última compra se existir; senão null)
+
+Ignora cardápio, preços, CNPJ da loja, cabeçalhos e rodapés.
+Não inventes telefones. Não resumas a lista num único cliente — devolve TODOS.
 Responde APENAS JSON:
-{"documentType":"customers"|"menu"|"mixed"|"unknown","customers":[{"name":"...","phone":"...","lastPurchaseAt":null,"daysAgo":null,"orderCount":null,"optIn":false,"optInSource":null,"optInProof":null}]}`;
+{"documentType":"customers"|"menu"|"mixed"|"unknown","customers":[{"name":"...","phone":"...","orderCount":null,"daysAgo":null,"lastPurchaseAt":null,"optIn":false,"optInSource":null,"optInProof":null}]}`;
 
 async function callChat(messages: unknown[]) {
   const response = await fetch(`${aiBaseUrl().replace(/\/$/, "")}/chat/completions`, {

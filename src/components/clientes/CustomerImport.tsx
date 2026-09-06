@@ -5,6 +5,7 @@ import { btnPrimaryClass, btnSecondaryClass } from "@/components/ui/tokens";
 import type { AudienceWithCount } from "@/lib/audiences/types";
 import type { ListFreshness } from "@/lib/customers/list-freshness";
 import type { ParsedCustomerRow } from "@/lib/customers/parse-sheet";
+import { daysSince } from "@/lib/segments/recency";
 import { formatWhatsAppPhone } from "@/lib/whatsapp/display";
 import type { Customer } from "@/types/database";
 
@@ -136,6 +137,9 @@ export function CustomerImport({
           Modelo CSV
         </a>
       </div>
+      <p className="text-[11px] text-[#667781]">
+        Excel/CSV: nome, WhatsApp, pedidos, dias sem pedir. PDF/foto usam etapa própria.
+      </p>
 
       {preview ? (
         <div className="rounded-xl border border-[#E9EDEF] bg-[#F0F2F5]/60 p-3">
@@ -155,17 +159,30 @@ export function CustomerImport({
                 <tr>
                   <th className="px-2 py-1.5 font-medium">Nome</th>
                   <th className="px-2 py-1.5 font-medium">WhatsApp</th>
+                  <th className="px-2 py-1.5 font-medium">Pedidos</th>
+                  <th className="px-2 py-1.5 font-medium">Dias sem pedir</th>
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.slice(0, 40).map((row) => (
-                  <tr key={row.phone} className="border-t border-[#E9EDEF]">
-                    <td className="px-2 py-1.5 text-[#111B21]">{row.name}</td>
-                    <td className="px-2 py-1.5 text-[#111B21]">
-                      {formatWhatsAppPhone(row.phone) ?? row.phone}
-                    </td>
-                  </tr>
-                ))}
+                {preview.rows.slice(0, 40).map((row) => {
+                  const days = row.lastPurchaseAt ? daysSince(row.lastPurchaseAt) : null;
+                  return (
+                    <tr key={row.phone} className="border-t border-[#E9EDEF]">
+                      <td className="px-2 py-1.5 text-[#111B21]">{row.name}</td>
+                      <td className="px-2 py-1.5 text-[#111B21]">
+                        {formatWhatsAppPhone(row.phone) ?? row.phone}
+                      </td>
+                      <td className="px-2 py-1.5 text-[#111B21]">
+                        {row.orderCount !== null && row.orderCount !== undefined
+                          ? row.orderCount
+                          : "—"}
+                      </td>
+                      <td className="px-2 py-1.5 text-[#111B21]">
+                        {days !== null && Number.isFinite(days) ? days : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

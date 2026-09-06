@@ -173,7 +173,10 @@ function scoreHeader(kind: keyof ColumnMap, key: string) {
     return 0;
   }
   if (kind === "orders") {
-    return key === "pedidos" ? 10 : 0;
+    if (key === "pedidos" || key === "orders" || key === "npedidos") return 10;
+    if (key.includes("qtd") && key.includes("pedido")) return 8;
+    if (key === "quantidade" || key === "qtd" || key === "totalpedidos") return 4;
+    return 0;
   }
   if (kind === "optIn") {
     if (key === "optin" || key === "opt" || key.includes("permissao") || key.includes("consentimento")) return 6;

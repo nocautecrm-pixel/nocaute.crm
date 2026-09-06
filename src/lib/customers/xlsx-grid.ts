@@ -107,7 +107,16 @@ function parseSheet(xml: string, shared: string[]) {
         const text = /<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>/i.exec(body)?.[1] ?? "";
         value = xmlText(text);
       } else {
-        value = xmlText(/<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/i.exec(body)?.[1] ?? "").trim();
+        const raw = xmlText(/<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/i.exec(body)?.[1] ?? "").trim();
+        // Telefone em célula numérica / científica → dígitos inteiros.
+        if (/^\d+(\.\d+)?e[+\-]?\d+$/i.test(raw)) {
+          const asNumber = Number(raw);
+          value = Number.isFinite(asNumber) ? Math.round(asNumber).toString() : raw;
+        } else if (/^\d+\.\d+$/.test(raw) && raw.replace(/\D/g, "").length >= 10) {
+          value = raw.split(".")[0] ?? raw;
+        } else {
+          value = raw;
+        }
       }
       while (line.length <= col) line.push("");
       line[col] = value.trim();
