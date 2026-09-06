@@ -7,6 +7,10 @@ import {
   isImportAiReady,
 } from "@/lib/customers/import-agent/llm";
 import { extractPdfLayoutText } from "@/lib/customers/import-agent/pdf-layout";
+import {
+  extractPotentialClientsReport,
+  looksLikePotentialClientsReport,
+} from "@/lib/customers/import-agent/pdf-potential-clients";
 import { extractPdfPlainText } from "@/lib/customers/import-agent/pdf-text";
 import type { ImportAgentResult, ImportMethod } from "@/lib/customers/import-agent/types";
 import {
@@ -106,7 +110,19 @@ async function readPdf(bytes: Uint8Array): Promise<ImportAgentResult> {
   }
 
   if (layoutText.length >= 12) {
-    // 3a) tentar como tabela
+    // 3a) Padrão "Clientes em Potencial" (Nome | Dias | R$ | Telefone)
+    if (looksLikePotentialClientsReport(layoutText)) {
+      const report = extractPotentialClientsReport(layoutText);
+      if (report.rows.length >= 1) {
+        notes.push(
+          `Etapa 3: relatório Clientes em Potencial · ${report.rows.length} contacto(s).`,
+        );
+        return finish("pdf", "pdf_texto", report, notes);
+      }
+      notes.push("Etapa 3: padrão Clientes em Potencial detetado, mas poucos contactos.");
+    }
+
+    // 3b) tentar como tabela genérica
     try {
       const grid = textToGrid(layoutText.replace(/\t/g, ";"));
       const parsed = parseCustomerGrid(grid);
@@ -118,14 +134,14 @@ async function readPdf(bytes: Uint8Array): Promise<ImportAgentResult> {
       // segue
     }
 
-    // 3b) linhas tipo "Nome - R$ … (19) 9 9669-8105" (relatórios de cardápio digital)
+    // 3c) caça telefones BR no texto
     const loose = extractCustomersFromLooseText(layoutText);
     if (loose.rows.length >= 2) {
       notes.push(`Etapa 3: ${loose.rows.length} contactos no texto do PDF.`);
       return finish("pdf", "texto_livre", loose, notes);
     }
 
-    // 3c) IA só se o texto livre trouxe pouco
+    // 3d) IA só se ainda veio pouco
     if (isImportAiReady()) {
       notes.push("Etapa 3: IA a interpretar o PDF.");
       try {
