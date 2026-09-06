@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { META_CONNECTED_LABEL, META_DISCONNECTED_LABEL } from "@/lib/whatsapp/constants";
+import { humanizeMetaSignupError, isMetaAppReviewError } from "@/lib/whatsapp/signup-errors";
 import type { WhatsAppConnection } from "@/types/store";
 
 type FbLoginResponse = {
@@ -107,7 +108,18 @@ export function useEmbeddedSignup(
           return;
         }
         if (data.event === "ERROR") {
-          setError(data.data?.error_message ?? "Erro no Embedded Signup.");
+          const raw =
+            data.data?.error_message ??
+            data.data?.error_code ??
+            data.error_message ??
+            data.error_code ??
+            "Erro no Embedded Signup.";
+          const code = data.data?.error_code ?? data.error_code;
+          const combined =
+            typeof code === "string" || typeof code === "number"
+              ? `${raw} (#${code})`
+              : String(raw);
+          setError(humanizeMetaSignupError(combined));
           return;
         }
         // FINISH e FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING (coexistência) trazem os IDs.
@@ -135,7 +147,9 @@ export function useEmbeddedSignup(
       }),
     });
     const payload = (await response.json()) as SignupResult;
-    if (!response.ok) throw new Error(payload.error ?? "Não foi possível conectar");
+    if (!response.ok) {
+      throw new Error(humanizeMetaSignupError(payload.error ?? "Não foi possível conectar"));
+    }
 
     setAccount({
       connected: true,
@@ -190,10 +204,8 @@ export function useEmbeddedSignup(
         fedCM: false,
         extras: {
           setup: {},
-          // Coexistência (ligar app do telemóvel). Meta exige Tech Provider + este featureType.
-          // Teste: a tela de WABA deve oferecer “conectar WhatsApp Business existente”, não só SMS.
+          // Sem isto a Meta cria número Cloud “por verificar” (SMS). Com isto: app/QR.
           featureType: "whatsapp_business_app_onboarding",
-          feature_type: "whatsapp_business_app_onboarding",
           sessionInfoVersion: "3",
         },
       };
@@ -217,14 +229,20 @@ export function useEmbeddedSignup(
         const code = response.authResponse?.code;
         if (!code) {
           setError(
-            "Popup fechou sem ligar. Se viste SMS ou “já registado”, era o fluxo errado — fecha e procura conectar o app WhatsApp Business (QR), não adicionar número.",
+            humanizeMetaSignupError(
+              "Popup fechou sem ligar. Se a Meta mostrou erro de permissões do app parceiro (#2655111), falta App Review. Se pediu SMS, o número Cloud está inválido — usa app/QR.",
+            ),
           );
           stopBusy();
           return;
         }
         void finishSignup(code)
           .catch((err) => {
-            setError(err instanceof Error ? err.message : "Falha na conexão");
+            setError(
+              err instanceof Error
+                ? humanizeMetaSignupError(err.message)
+                : "Falha na conexão",
+            );
           })
           .finally(() => {
             stopBusy();
@@ -264,6 +282,7 @@ export function useEmbeddedSignup(
     busy,
     disconnecting,
     error,
+    appReviewBlocked: isMetaAppReviewError(error),
     connected,
     connectDisabled,
     disconnectDisabled,
