@@ -138,7 +138,8 @@ export function CustomerImport({
         </a>
       </div>
       <p className="text-[11px] text-[#667781]">
-        Excel/CSV: nome, WhatsApp, pedidos, dias sem pedir. PDF/foto usam etapa própria.
+        Excel: Nome do Cliente, Número Telefone, Número Whatsapp, Quantidade de Pedidos. PDF: etapa
+        própria.
       </p>
 
       {preview ? (

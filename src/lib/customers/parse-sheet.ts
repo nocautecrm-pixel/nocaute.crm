@@ -21,6 +21,8 @@ export type ParseCustomerResult = {
 type ColumnMap = {
   name: number;
   phone: number;
+  /** Segunda coluna de telefone (ex.: Número Telefone quando a principal é WhatsApp). */
+  phoneAlt: number;
   date: number;
   days: number;
   orders: number;
@@ -163,7 +165,9 @@ function scoreHeader(kind: keyof ColumnMap, key: string) {
   }
   if (kind === "days") {
     if (key.includes("quantidade") || key.includes("qtd") || key.includes("optin") || key === "pedidos") return 0;
-    if (key.includes("naopede") || key.includes("sempedir") || key.includes("semcompra")) return 10;
+    if (key.includes("naopede") || key.includes("sempedir") || key.includes("semcompra") || key.includes("semcomprar")) {
+      return 10;
+    }
     if (key.includes("dias") && (key.includes("pede") || key.includes("pedir") || key.includes("compra") || key.includes("visita") || key.includes("sumiu"))) {
       return 10;
     }
@@ -173,9 +177,12 @@ function scoreHeader(kind: keyof ColumnMap, key: string) {
     return 0;
   }
   if (kind === "orders") {
+    // "Quantidade de Pedidos", "pedidos", "qtd_pedidos"
+    if (key.includes("pedido") && (key.includes("quantidad") || key.includes("qtd") || key.includes("total"))) {
+      return 10;
+    }
     if (key === "pedidos" || key === "orders" || key === "npedidos") return 10;
-    if (key.includes("qtd") && key.includes("pedido")) return 8;
-    if (key === "quantidade" || key === "qtd" || key === "totalpedidos") return 4;
+    if (key === "quantidade" || key === "qtd") return 3;
     return 0;
   }
   if (kind === "optIn") {
@@ -211,6 +218,32 @@ function pickHeaderIndex(headers: string[], kind: keyof ColumnMap) {
     }
   });
   return bestScore > 0 ? best : -1;
+}
+
+/** Excel "Clientes em potencial": Número Whatsapp + Número Telefone (fallback por linha). */
+function pickPhoneColumns(headers: string[]): { phone: number; phoneAlt: number } {
+  let whatsapp = -1;
+  let telefone = -1;
+  headers.forEach((key, index) => {
+    if (key.includes("whatsapp") || key === "wpp" || key === "zap") {
+      if (whatsapp < 0) whatsapp = index;
+      return;
+    }
+    if (
+      key.includes("telefone") ||
+      key.includes("phone") ||
+      key.includes("celular") ||
+      key === "fone" ||
+      key === "tel"
+    ) {
+      if (telefone < 0) telefone = index;
+    }
+  });
+  if (whatsapp >= 0 && telefone >= 0) return { phone: whatsapp, phoneAlt: telefone };
+  if (whatsapp >= 0) return { phone: whatsapp, phoneAlt: -1 };
+  if (telefone >= 0) return { phone: telefone, phoneAlt: -1 };
+  const fallback = pickHeaderIndex(headers, "phone");
+  return { phone: fallback, phoneAlt: -1 };
 }
 
 function inferDaysIndex(grid: string[][], phone: number) {
@@ -300,9 +333,11 @@ function resolveColumns(grid: string[][]): { map: ColumnMap; dataStart: number }
   const headerAt = headerRowIndex(grid);
   if (headerAt >= 0) {
     const headers = grid[headerAt].map(headerKey);
+    const phones = pickPhoneColumns(headers);
     const map: ColumnMap = {
       name: pickHeaderIndex(headers, "name"),
-      phone: pickHeaderIndex(headers, "phone"),
+      phone: phones.phone,
+      phoneAlt: phones.phoneAlt,
       date: pickHeaderIndex(headers, "date"),
       days: pickHeaderIndex(headers, "days"),
       orders: pickHeaderIndex(headers, "orders"),
@@ -331,6 +366,7 @@ function resolveColumns(grid: string[][]): { map: ColumnMap; dataStart: number }
     map: {
       name,
       phone,
+      phoneAlt: -1,
       date,
       days,
       orders: -1,
@@ -391,9 +427,13 @@ export function parseCustomerGrid(grid: string[][]): ParseCustomerResult {
 
   for (const [offset, cols] of grid.slice(dataStart).entries()) {
     const line = dataStart + offset + 1;
-    const phone = normalizeToE164(cols[map.phone] ?? "");
+    const phone =
+      normalizeToE164(cols[map.phone] ?? "") ??
+      (map.phoneAlt >= 0 ? normalizeToE164(cols[map.phoneAlt] ?? "") : null);
     if (!phone) {
-      if ((cols[map.phone] ?? "").trim()) {
+      const rawPrimary = (cols[map.phone] ?? "").trim();
+      const rawAlt = map.phoneAlt >= 0 ? (cols[map.phoneAlt] ?? "").trim() : "";
+      if (rawPrimary || rawAlt) {
         invalid += 1;
         rejected.push(`Linha ${line}: telefone inválido.`);
       }

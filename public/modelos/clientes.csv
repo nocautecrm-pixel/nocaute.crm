@@ -1,4 +1,4 @@
-nome,whatsapp,pedidos,dias_sem_pedir
-Maria Silva,11991112222,18,22
-João Santos,11993334444,7,5
-Ana Costa,11985556666,4,48
+Nome do Cliente,Número Telefone,Número Whatsapp,Quantidade de Pedidos,Dias sem comprar
+Maria Silva,11991112222,5511991112222,18,22
+João Santos,11993334444,,7,5
+Ana Costa,11985556666,5511985556666,4,48
