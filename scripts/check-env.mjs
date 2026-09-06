@@ -26,7 +26,21 @@ const groups = {
     "SUPABASE_SERVICE_ROLE_KEY",
     "TOKEN_ENCRYPTION_KEY",
   ],
+  "Asaas (opcional · mensalidade)": [
+    "ASAAS_ENV",
+    "ASAAS_API_KEY",
+    "ASAAS_WEBHOOK_TOKEN",
+  ],
+  "Import agent IA (opcional · PDF scan / foto)": [
+    "OPENAI_API_KEY",
+  ],
 };
+
+/** Grupos que não entram no contador de “faltando” (ainda opcional no MVP). */
+const optionalGroups = new Set([
+  "Asaas (opcional · mensalidade)",
+  "Import agent IA (opcional · PDF scan / foto)",
+]);
 
 function status(key) {
   const value = process.env[key]?.trim();
@@ -37,11 +51,12 @@ function status(key) {
 
 let missing = 0;
 for (const [title, keys] of Object.entries(groups)) {
+  const optional = optionalGroups.has(title);
   console.log(`-- ${title} --`);
   for (const key of keys) {
     const s = status(key);
-    if (s === "falta") missing += 1;
-    const mark = s === "ok" ? "+" : s === "falta" ? "-" : "?";
+    if (s === "falta" && !optional) missing += 1;
+    const mark = s === "ok" ? "+" : s === "falta" ? (optional ? "o" : "-") : "?";
     console.log(`  [${mark}] ${key}`);
   }
   console.log("");
