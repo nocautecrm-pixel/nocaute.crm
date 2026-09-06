@@ -4,10 +4,7 @@ import {
   type ParseCustomerResult,
   type ParsedCustomerRow,
 } from "@/lib/customers/parse-sheet";
-import { normalizeToE164 } from "@/lib/whatsapp/phone";
-
-const PHONE_CHUNK =
-  /(?:\+?\d{1,3}[\s./-]?)?(?:\(?\d{2}\)?[\s./-]?)?\d{4,5}[\s./-]?\d{4}|\b\d{10,13}\b/g;
+import { findBrazilianPhoneMatches, normalizeToE164 } from "@/lib/whatsapp/phone";
 
 function collapseByPhone(rows: ParsedCustomerRow[]) {
   const map = new Map<string, ParsedCustomerRow>();
@@ -35,24 +32,45 @@ function collapseByPhone(rows: ParsedCustomerRow[]) {
   return [...map.values()];
 }
 
-function guessNameNearPhone(line: string, phoneRaw: string) {
-  const cleaned = line.replace(phoneRaw, " ").replace(/\s+/g, " ").trim();
-  const withoutNoise = cleaned
-    .replace(/\b(cliente|nome|tel|telefone|whatsapp|wpp|celular|fone)\b/gi, " ")
-    .replace(/[|;,]+/g, " ")
+function isReportNoise(value: string) {
+  const lower = value.toLowerCase();
+  return (
+    lower.includes("relatório") ||
+    lower.includes("relatorio") ||
+    lower.includes("clientes em potencial") ||
+    lower.includes("página") ||
+    lower.includes("pagina") ||
+    lower.includes("total de") ||
+    /^cnpj\b/i.test(value)
+  );
+}
+
+/** "João Pedro - R$ 0,00 (19) 9 9669-8105" → João Pedro */
+function nameFromLine(line: string, phoneRaw: string) {
+  let cleaned = line
+    .replace(phoneRaw, " ")
+    .replace(/R\$\s*[\d.]*\d,\d{2}/gi, " ")
+    .replace(/R\$\s*[\d.,]+/gi, " ")
+    .replace(/[-–—·|]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (withoutNoise.length >= 2 && withoutNoise.length <= 80 && !/^\d+$/.test(withoutNoise)) {
-    return withoutNoise;
-  }
-  return null;
+
+  // Corta lixo depois de dois pontos de título.
+  cleaned = cleaned.replace(/\bRelat[oó]rio:.*$/i, "").trim();
+  if (isReportNoise(cleaned) || cleaned.length < 2) return null;
+  if (cleaned.length > 80) cleaned = cleaned.slice(0, 80).trim();
+  if (/^\d+$/.test(cleaned)) return null;
+  return cleaned;
 }
 
 function lineContext(lines: string[], index: number) {
   return [lines[index - 1], lines[index], lines[index + 1]].filter(Boolean).join(" · ");
 }
 
-/** Lê texto bagunçado (PDF, export feio, bloco copiado) e caça nome+telefone. */
+/**
+ * Lê texto de PDF/export (ex.: "Clientes em Potencial") e extrai
+ * nome + WhatsApp BR, linha a linha.
+ */
 export function extractCustomersFromLooseText(text: string): ParseCustomerResult {
   const lines = text
     .replace(/\r/g, "\n")
@@ -67,23 +85,56 @@ export function extractCustomersFromLooseText(text: string): ParseCustomerResult
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    const matches = line.match(PHONE_CHUNK) ?? [];
+    if (isReportNoise(line) && findBrazilianPhoneMatches(line).length === 0) {
+      continue;
+    }
+
+    const matches = findBrazilianPhoneMatches(line);
+    if (matches.length === 0) {
+      // Às vezes o nome está numa linha e o telefone na seguinte.
+      const next = lines[i + 1] ?? "";
+      const nextPhones = findBrazilianPhoneMatches(next);
+      if (nextPhones.length === 1 && !findBrazilianPhoneMatches(line).length) {
+        const phoneRaw = nextPhones[0];
+        const phone = normalizeToE164(phoneRaw);
+        if (phone && !seen.has(phone)) {
+          const name = nameFromLine(line, "") ?? `Cliente ${phone.slice(-4)}`;
+          if (!isReportNoise(name)) {
+            seen.add(phone);
+            collected.push({
+              name,
+              phone,
+              lastPurchaseAt: null,
+              orderCount: null,
+              optIn: false,
+              optInAt: null,
+              optInSource: null,
+              optInProof: null,
+            });
+          }
+        }
+      }
+      continue;
+    }
+
     for (const raw of matches) {
       const phone = normalizeToE164(raw);
       if (!phone) {
-        if (raw.replace(/\D/g, "").length >= 8) {
-          invalid += 1;
-          rejected.push(`Telefone inválido perto de: ${line.slice(0, 48)}`);
-        }
+        invalid += 1;
+        rejected.push(`Telefone inválido perto de: ${line.slice(0, 56)}`);
         continue;
       }
       if (seen.has(phone)) continue;
       seen.add(phone);
 
       const name =
-        guessNameNearPhone(line, raw) ??
-        guessNameNearPhone(lineContext(lines, i), raw) ??
+        nameFromLine(line, raw) ??
+        nameFromLine(lineContext(lines, i), raw) ??
         `Cliente ${phone.slice(-4)}`;
+
+      if (isReportNoise(name)) {
+        continue;
+      }
 
       let lastPurchaseAt: string | null = null;
       const ctx = lineContext(lines, i);
@@ -105,28 +156,6 @@ export function extractCustomersFromLooseText(text: string): ParseCustomerResult
         optInProof: null,
       });
     }
-  }
-
-  // Também tenta pares "Nome: X / Tel: Y" em blocos multilinha
-  const blob = text.replace(/\s+/g, " ");
-  const pairRe =
-    /(?:nome|cliente)\s*[:\-]\s*([^|]{2,60}?)\s*(?:tel|telefone|whatsapp|celular|wpp)\s*[:\-]\s*([+\d()\s./-]{8,20})/gi;
-  let pair: RegExpExecArray | null;
-  while ((pair = pairRe.exec(blob))) {
-    const phone = normalizeToE164(pair[2]);
-    if (!phone || seen.has(phone)) continue;
-    seen.add(phone);
-    const name = pair[1].trim();
-    collected.push({
-      name: name.length >= 2 ? name : `Cliente ${phone.slice(-4)}`,
-      phone,
-      lastPurchaseAt: null,
-      orderCount: null,
-      optIn: false,
-      optInAt: null,
-      optInSource: null,
-      optInProof: null,
-    });
   }
 
   return {

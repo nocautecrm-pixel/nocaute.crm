@@ -115,27 +115,31 @@ async function readPdf(bytes: Uint8Array): Promise<ImportAgentResult> {
         return finish("pdf", "pdf_texto", parsed, notes);
       }
     } catch {
-      // segue para texto livre / IA
+      // segue
     }
 
-    // 3b) caça telefones no layout (sem competir com outros formatos)
+    // 3b) linhas tipo "Nome - R$ … (19) 9 9669-8105" (relatórios de cardápio digital)
     const loose = extractCustomersFromLooseText(layoutText);
-    if (loose.rows.length >= 2 && !isImportAiReady()) {
-      notes.push("Etapa 3: telefones no texto do PDF.");
+    if (loose.rows.length >= 2) {
+      notes.push(`Etapa 3: ${loose.rows.length} contactos no texto do PDF.`);
       return finish("pdf", "texto_livre", loose, notes);
     }
 
-    // 3c) IA só se configurada (PDF difícil)
+    // 3c) IA só se o texto livre trouxe pouco
     if (isImportAiReady()) {
       notes.push("Etapa 3: IA a interpretar o PDF.");
-      const ai = await extractCustomersWithAiText(layoutText);
-      if (ai.rows.length > 0) {
-        return finish("pdf", "ia_texto", ai, notes, true);
+      try {
+        const ai = await extractCustomersWithAiText(layoutText);
+        if (ai.rows.length > 0) {
+          return finish("pdf", "ia_texto", ai, notes, true);
+        }
+      } catch (error) {
+        notes.push(error instanceof Error ? error.message : "IA falhou.");
       }
     }
 
     if (loose.rows.length > 0) {
-      notes.push("Etapa 3: telefones no texto do PDF.");
+      notes.push("Etapa 3: telefones no texto do PDF (poucos).");
       return finish("pdf", "texto_livre", loose, notes);
     }
   }
