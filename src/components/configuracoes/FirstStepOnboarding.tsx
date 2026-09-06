@@ -28,15 +28,19 @@ export function FirstStepOnboarding({
   connectDisabled,
   connected,
   onConnect,
+  bare = false,
 }: {
   connecting: boolean;
   connectLabel: string;
   connectDisabled: boolean;
   connected: boolean;
   onConnect: () => void;
+  bare?: boolean;
 }) {
   return (
-    <section className={`${cardClass} flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4`}>
+    <section
+      className={`${bare ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4" : `${cardClass} flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4`}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className={`${eyebrowClass} text-emerald-700`}>WhatsApp oficial</p>
@@ -82,12 +86,21 @@ export function FirstStepOnboarding({
         })}
       </ol>
 
-      <div className="mt-3 rounded-lg border border-amber-200/80 bg-amber-50/70 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
-        <p className="font-semibold">Se pedir SMS / “número já registado”</p>
+      <div className="mt-3 rounded-lg border border-amber-200/90 bg-amber-50/80 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
+        <p className="font-semibold">Se a Meta disser “app do parceiro sem permissões” (#2655111)</p>
         <p className="mt-0.5 text-amber-900/90">
-          Estás no caminho errado (criar do zero). Fecha, clica de novo e procura a opção de{" "}
-          <span className="font-semibold">app WhatsApp Business / QR</span>. SMS só serve para
-          número que ainda não está no WhatsApp.
+          Falta <span className="font-semibold">App Review</span> no app Nocaute CRM: Advanced Access de{" "}
+          <span className="font-semibold">whatsapp_business_messaging</span> e{" "}
+          <span className="font-semibold">whatsapp_business_management</span>. Sem isso o QR não abre —
+          não é falha do telemóvel nem do SMS.
+        </p>
+      </div>
+
+      <div className="mt-2 rounded-lg border border-rose-200/90 bg-rose-50/80 px-2.5 py-2 text-[11px] leading-snug text-rose-950">
+        <p className="font-semibold">Se a Meta pedir “Enviar código de verificação” (SMS)</p>
+        <p className="mt-0.5 text-rose-900/90">
+          Número Cloud criado no fluxo errado. Apaga esse telefone na WABA e reconecta pelo{" "}
+          <span className="font-semibold">app / QR</span>, não por “adicionar número”.
         </p>
       </div>
 

@@ -34,6 +34,7 @@ export function StoreProfileForm({
   menuUrl = "",
   address = "",
   hoursText = "",
+  bare = false,
 }: {
   name: string;
   city: string;
@@ -41,6 +42,8 @@ export function StoreProfileForm({
   menuUrl?: string;
   address?: string;
   hoursText?: string;
+  /** Sem borda própria — o StageCard envolve o bloco. */
+  bare?: boolean;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -141,7 +144,9 @@ export function StoreProfileForm({
   }
 
   return (
-    <section className={`${cardClass} flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4`}>
+    <section
+      className={`${bare ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4" : `${cardClass} flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4`}`}
+    >
       <div className="shrink-0">
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#667781]">
           Dentro da etapa Loja · {step + 1} de {STEPS.length}

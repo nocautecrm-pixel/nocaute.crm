@@ -8,7 +8,6 @@ import { StatusDot } from "@/components/ui/StatusDot";
 import {
   btnDangerClass,
   btnSecondaryClass,
-  cardClass,
   eyebrowClass,
   insetClass,
 } from "@/components/ui/tokens";
@@ -18,9 +17,12 @@ import type { WhatsAppConnection } from "@/types/store";
 export function WhatsAppConnectPanel({
   connection,
   onConnected,
+  bare = false,
 }: {
   connection: WhatsAppConnection;
   onConnected?: () => void;
+  /** Sem card próprio — o StageCard envolve o bloco. */
+  bare?: boolean;
 }) {
   const router = useRouter();
   const signup = useEmbeddedSignup(connection, () => {
@@ -36,6 +38,10 @@ export function WhatsAppConnectPanel({
     void signup.disconnect();
   }
 
+  const shell = bare
+    ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4"
+    : "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#E9EDEF] bg-white p-4 shadow-[0_1px_3px_rgba(11,20,26,0.08)]";
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       {signup.officialLoginReady ? (
@@ -47,7 +53,7 @@ export function WhatsAppConnectPanel({
       ) : null}
 
       {signup.connected ? (
-        <section className={`${cardClass} flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4`}>
+        <section className={shell}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className={eyebrowClass}>WhatsApp da loja</p>
@@ -109,10 +115,25 @@ export function WhatsAppConnectPanel({
           connectDisabled={signup.connectDisabled}
           connected={false}
           onConnect={signup.connect}
+          bare={bare}
         />
       )}
 
-      {signup.error ? <p className="mt-2 text-sm text-red-600">{signup.error}</p> : null}
+      {signup.error ? (
+        <div
+          role="alert"
+          className={`mt-2 rounded-lg border px-3 py-2 text-[12px] leading-snug ${
+            signup.appReviewBlocked
+              ? "border-amber-300 bg-amber-50 text-amber-950"
+              : "border-rose-200 bg-rose-50 text-rose-900"
+          }`}
+        >
+          {signup.appReviewBlocked ? (
+            <p className="mb-1 font-semibold tracking-tight">Falta App Review no app parceiro</p>
+          ) : null}
+          <p>{signup.error}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

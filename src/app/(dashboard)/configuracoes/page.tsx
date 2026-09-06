@@ -1,4 +1,4 @@
-import { StageHud } from "@/components/configuracoes/StageHud";
+import { StageCard } from "@/components/configuracoes/StageHud";
 import { StoreProfileForm } from "@/components/configuracoes/StoreProfileForm";
 import { MetaIntegrationStatus } from "@/components/configuracoes/MetaIntegrationStatus";
 import { WhatsAppConnectPanel } from "@/components/integracao/WhatsAppConnectPanel";
@@ -15,32 +15,35 @@ export default async function ConfiguracoesPage() {
     <div className="flex h-full min-h-0 items-stretch justify-center overflow-y-auto lg:items-center lg:overflow-hidden">
       <div className="grid w-full grid-cols-1 gap-3 lg:h-[min(520px,calc(100%-0.25rem))] lg:grid-cols-3">
         <section className="flex min-h-0 flex-col lg:h-full">
-          <StageHud
+          <StageCard
             step={1}
             title="Loja"
             done={storeReady}
             doneLabel="Loja etapa realizada"
             pendingHint="Preenche e salva o perfil da casa"
-          />
-          <StoreProfileForm
-            name={store.storeName}
-            city={store.city}
-            logoUrl={store.logoUrl}
-            menuUrl={store.menuUrl}
-            address={store.address}
-            hoursText={store.hoursText}
-          />
+          >
+            <StoreProfileForm
+              bare
+              name={store.storeName}
+              city={store.city}
+              logoUrl={store.logoUrl}
+              menuUrl={store.menuUrl}
+              address={store.address}
+              hoursText={store.hoursText}
+            />
+          </StageCard>
         </section>
 
         <section className="flex min-h-0 flex-col lg:h-full">
-          <StageHud
+          <StageCard
             step={2}
             title="WhatsApp Meta"
             done={connected}
             doneLabel="WhatsApp Meta etapa realizada"
             pendingHint="Popup da Meta · QR no celular"
-          />
-          <WhatsAppConnectPanel connection={store.whatsapp} />
+          >
+            <WhatsAppConnectPanel bare connection={store.whatsapp} />
+          </StageCard>
         </section>
 
         <section className="flex min-h-0 flex-col lg:h-full">
