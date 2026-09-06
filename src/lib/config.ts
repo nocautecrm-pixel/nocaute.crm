@@ -80,6 +80,13 @@ export function isRedisConfigured() {
   return Boolean(process.env.REDIS_URL);
 }
 
+/** Mensalidade Asaas (cartão/Pix). Opcional até preencher ASAAS_* no env. */
+export function isAsaasConfigured() {
+  const key = process.env.ASAAS_API_KEY?.trim();
+  const token = process.env.ASAAS_WEBHOOK_TOKEN?.trim();
+  return Boolean(key && token && key !== token);
+}
+
 export function getGraphVersion() {
   return process.env.META_GRAPH_VERSION ?? "v21.0";
 }

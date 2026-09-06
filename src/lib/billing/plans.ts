@@ -2,19 +2,19 @@ export const PLANS = [
   {
     slug: "basico" as const,
     name: "Básico",
-    priceCents: 14000,
-    includedLeads: 700,
+    priceCents: 19000,
+    includedLeads: 1000,
   },
   {
-    slug: "intermediario" as const,
-    name: "Intermediário",
-    priceCents: 25000,
-    includedLeads: 1400,
+    slug: "custom" as const,
+    name: "Custom",
+    priceCents: 24900,
+    includedLeads: 1800,
   },
   {
     slug: "pro" as const,
     name: "Pro",
-    priceCents: 34000,
+    priceCents: 29900,
     includedLeads: 3000,
   },
 ] as const;
@@ -55,7 +55,7 @@ export class QuotaExceededError extends Error {
     public readonly planName: string,
   ) {
     super(
-      `A campanha precisa de ${needed} lead(s) da ferramenta. Restam ${remaining} no plano ${planName} (${included}/mês). Faça upgrade para continuar a automação — o WhatsApp da Meta continua livre.`,
+      `A campanha precisa de ${needed} disparo(s) da ferramenta. Restam ${remaining} no plano ${planName} (${included}/mês). Faça upgrade para continuar a automação — o WhatsApp da Meta continua livre.`,
     );
     this.name = "QuotaExceededError";
   }

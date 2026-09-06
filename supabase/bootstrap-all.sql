@@ -251,9 +251,9 @@ create table if not exists public.plans (
 
 insert into public.plans (slug, name, price_cents, included_leads)
 values
-  ('basico', 'Básico', 14000, 700),
-  ('intermediario', 'Intermediário', 25000, 1400),
-  ('pro', 'Pro', 34000, 3000)
+  ('basico', 'Básico', 19000, 1000),
+  ('custom', 'Custom', 24900, 1800),
+  ('pro', 'Pro', 29900, 3000)
 on conflict (slug) do update
   set name = excluded.name,
       price_cents = excluded.price_cents,

@@ -34,6 +34,7 @@ console.log("Próximo: abra .env.local e preencha:");
 console.log("  - NEXT_PUBLIC_SUPABASE_URL / ANON / SERVICE_ROLE (Supabase → Settings → API)");
 console.log("  - REDIS_URL (Railway Redis ou redis://127.0.0.1:6379 com npm run infra:redis)");
 console.log("  - Bloco Meta (developers.facebook.com) quando for testar WhatsApp real");
+console.log("  - Bloco Asaas (ASAAS_*) quando for ligar mensalidade — ver .env.example");
 console.log("");
 console.log("WEBHOOK_VERIFY_TOKEN (use o mesmo na Meta e na Vercel):");
 console.log(`  ${webhookToken}`);
