@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncedState } from "@/components/useSyncedState";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CustomerImport, type CustomerBoardSnapshot } from "@/components/clientes/CustomerImport";
 import { StatusDot } from "@/components/ui/StatusDot";
 import {
@@ -29,6 +30,7 @@ type Draft = {
   optIn: boolean;
   optInSource: OptInSource | "";
   optInProof: string;
+  restoreConsentRevokedAt?: string;
 };
 
 type AudienceDraft = {
@@ -46,8 +48,10 @@ function toDraft(customer: Customer): Draft {
     lastVisitAt: customer.lastPurchaseAt ? customer.lastPurchaseAt.slice(0, 10) : "",
     orderCount: String(customer.orderCount ?? 0),
     optIn: customer.optIn,
-    optInSource: (customer.optInSource as OptInSource) ?? "",
-    optInProof: customer.optInProof ?? "",
+    optInSource: customer.optInSource === "recusa_whatsapp" ? "" : (customer.optInSource as OptInSource) ?? "",
+    optInProof: customer.optInSource === "recusa_whatsapp" ? "" : customer.optInProof ?? "",
+    restoreConsentRevokedAt: !customer.optIn && customer.optInSource === "recusa_whatsapp"
+      ? customer.optInAt ?? undefined : undefined,
   };
 }
 
@@ -75,9 +79,9 @@ export function CustomerBoard({
   publico?: string;
 }) {
   const router = useRouter();
-  const [rows, setRows] = useState(customers);
-  const [audienceRows, setAudienceRows] = useState(audiences);
-  const [listFreshness, setListFreshness] = useState(freshness);
+  const [rows, setRows] = useSyncedState(customers);
+  const [audienceRows, setAudienceRows] = useSyncedState(audiences);
+  const [listFreshness, setListFreshness] = useSyncedState(freshness);
   const [sortKey, setSortKey] = useState<"days" | "orders">("days");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -88,19 +92,6 @@ export function CustomerBoard({
   const [audienceForm, setAudienceForm] = useState<AudienceDraft | null>(null);
   const [audienceStatus, setAudienceStatus] = useState<string | null>(null);
   const [audienceSaving, setAudienceSaving] = useState(false);
-
-  // RSC/revalidate pode remountar com props novas — mantém a lista alinhada sem F5.
-  useEffect(() => {
-    setRows(customers);
-  }, [customers]);
-
-  useEffect(() => {
-    setAudienceRows(audiences);
-  }, [audiences]);
-
-  useEffect(() => {
-    setListFreshness(freshness);
-  }, [freshness]);
 
   function applyBoard(snapshot: CustomerBoardSnapshot) {
     if (snapshot.customers !== undefined) setRows(snapshot.customers);
@@ -197,6 +188,7 @@ export function CustomerBoard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...draft,
+          optInSource: draft.optInSource || undefined,
           orderCount: Number(draft.orderCount) || 0,
         }),
       });
@@ -673,7 +665,7 @@ export function CustomerBoard({
                   </select>
                 </label>
                 <label className={labelClass}>
-                  <span className={labelTextClass}>Comprovante (nº pedido, reserva…)</span>
+                  <span className={labelTextClass}>{draft.restoreConsentRevokedAt ? "Novo comprovante de autorização após a recusa" : "Comprovante (nº pedido, reserva…)"}</span>
                   <input
                     value={draft.optInProof}
                     onChange={(event) =>

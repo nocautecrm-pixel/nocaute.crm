@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useSyncedState } from "@/components/useSyncedState";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { META_CONNECTED_LABEL, META_DISCONNECTED_LABEL } from "@/lib/whatsapp/constants";
 import { humanizeMetaSignupError, isMetaAppReviewError } from "@/lib/whatsapp/signup-errors";
 import type { WhatsAppConnection } from "@/types/store";
@@ -55,29 +56,19 @@ export function useEmbeddedSignup(
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [account, setAccount] = useState({
+  const incomingAccount = useMemo(() => ({
     connected: connection.connected,
     displayPhone: connection.displayPhone,
     verifiedName: connection.verifiedName,
     wabaId: connection.wabaId,
     phoneNumberId: connection.phoneNumberId,
     label: connection.label,
-  });
+  }), [connection]);
+  const [account, setAccount] = useSyncedState(incomingAccount);
 
   const appId = process.env.NEXT_PUBLIC_META_APP_ID?.trim();
   const configId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID?.trim();
   const officialLoginReady = Boolean(appId && configId);
-
-  useEffect(() => {
-    setAccount({
-      connected: connection.connected,
-      displayPhone: connection.displayPhone,
-      verifiedName: connection.verifiedName,
-      wabaId: connection.wabaId,
-      phoneNumberId: connection.phoneNumberId,
-      label: connection.label,
-    });
-  }, [connection]);
 
   const initFacebookSdk = useCallback(() => {
     if (sdkInited.current || !appId || !window.FB) return;

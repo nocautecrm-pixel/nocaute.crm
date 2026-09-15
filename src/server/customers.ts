@@ -37,6 +37,7 @@ type CustomerInput = {
   optIn: boolean;
   optInSource?: string;
   optInProof?: string;
+  restoreConsentRevokedAt?: string;
 };
 
 function parseVisitAt(raw?: string | null) {
@@ -403,7 +404,7 @@ function newerVisit(left: string | null, right: string | null) {
 }
 
 function mergeImportedCustomer(existing: Customer, incoming: ParsedCustomerRow): Customer {
-  const incomingProven = hasProvenOptIn({
+  const incomingProven = existing.optInSource !== "recusa_whatsapp" && hasProvenOptIn({
     optIn: incoming.optIn,
     optInAt: incoming.optInAt,
     optInSource: incoming.optInSource,
@@ -557,6 +558,18 @@ export async function updateCustomer(restaurantId: string, id: string, input: Cu
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("Cliente não encontrado.");
+  if (input.optIn && !data.opt_in) {
+    if (!input.restoreConsentRevokedAt) {
+      throw new Error("O consentimento foi revogado. Atualize a página e registre um novo comprovante para reativar.");
+    }
+    const restored = await admin.rpc("restore_customer_consent", {
+      p_restaurant_id: restaurantId, p_customer_id: id,
+      p_source: input.optInSource!.trim(), p_proof: input.optInProof!.trim(),
+      p_expected_revoked_at: input.restoreConsentRevokedAt,
+    });
+    if (restored.error) throw restored.error;
+    return withSegment(mapRow(restored.data as Parameters<typeof mapRow>[0]));
+  }
   return withSegment(mapRow(data));
 }
 

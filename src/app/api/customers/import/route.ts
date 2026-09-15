@@ -6,6 +6,10 @@ import { parseCustomerImportFile } from "@/lib/customers/import-file";
 import { getCustomerBoard } from "@/server/customer-board";
 import { importCustomers } from "@/server/customers";
 import { getCurrentRestaurantId } from "@/server/tenant";
+import { AuthRequiredError, StoreRequiredError } from "@/server/tenant";
+import { BackendUnavailableError } from "@/lib/config";
+import { readBoundedBody } from "@/lib/customers/import-limits";
+import { ImportBudgetError, withImportTenant, withImportBudget } from "@/server/compliance/import-budget";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,13 +24,18 @@ function revalidateCustomerPaths() {
 
 export async function POST(request: NextRequest) {
   try {
+    const restaurantId = await getCurrentRestaurantId();
+    return await withImportTenant(restaurantId, () => withImportBudget("import", async () => {
     const contentType = request.headers.get("content-type") ?? "";
+    const bytes = await readBoundedBody(request.body, MAX_BYTES + 100_000);
+    const boundedRequest = new Request(request.url, {
+      method: "POST", headers: { "content-type": contentType }, body: bytes.buffer as ArrayBuffer,
+    });
 
     // Confirmação do preview (JSON com linhas já interpretadas pelo agent).
     if (contentType.includes("application/json")) {
-      const body = (await request.json()) as { rows?: unknown };
+      const body = (await boundedRequest.json()) as { rows?: unknown };
       const rows = normalizeImportRows(body.rows);
-      const restaurantId = await getCurrentRestaurantId();
       const result = await importCustomers(restaurantId, rows);
       const board = await getCustomerBoard(restaurantId);
       revalidateCustomerPaths();
@@ -42,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const form = await request.formData();
+    const form = await boundedRequest.formData();
     const mode = String(form.get("mode") ?? "import");
     const file = form.get("file");
     if (!(file instanceof File)) {
@@ -55,11 +64,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Arquivo acima de 8 MB." }, { status: 400 });
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const fileBytes = new Uint8Array(await file.arrayBuffer());
     const analyzed = await parseCustomerImportFile({
       filename: file.name,
       mime: file.type,
-      bytes,
+      bytes: fileBytes,
     });
 
     if (mode === "analyze") {
@@ -79,7 +88,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const restaurantId = await getCurrentRestaurantId();
     const result = await importCustomers(restaurantId, analyzed.rows);
     const board = await getCustomerBoard(restaurantId);
     revalidateCustomerPaths();
@@ -93,7 +101,12 @@ export async function POST(request: NextRequest) {
       previewLabel: analyzed.previewLabel,
       ...board,
     });
+    }));
   } catch (error) {
+    if (error instanceof AuthRequiredError) return NextResponse.json({ error: "Faça login." }, { status: 401 });
+    if (error instanceof StoreRequiredError) return NextResponse.json({ error: "Loja não provisionada." }, { status: 403 });
+    if (error instanceof BackendUnavailableError) return NextResponse.json({ error: "Sistema indisponível." }, { status: 503 });
+    if (error instanceof ImportBudgetError) return NextResponse.json({ error: error.message }, { status: 429 });
     const message = error instanceof Error ? error.message : "Falha ao importar clientes";
     return NextResponse.json({ error: message }, { status: 400 });
   }

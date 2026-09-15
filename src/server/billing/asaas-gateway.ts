@@ -101,6 +101,7 @@ export async function startPlanCheckout(input: {
     };
   }
 
+  if (process.env.NEW_CHECKOUTS_PAUSED === "true") throw new Error("Novas assinaturas temporariamente pausadas.");
   requireLiveBackend();
   const admin = createSupabaseAdminClient();
   if (!admin) throw new BackendUnavailableError();
@@ -117,7 +118,7 @@ export async function startPlanCheckout(input: {
   const [{ data: restaurant }, server] = await Promise.all([
     admin
       .from("restaurants")
-      .select("id, name, asaas_customer_id, billing_cpf_cnpj")
+      .select("id, name, owner_user_id, asaas_customer_id, billing_cpf_cnpj")
       .eq("id", input.restaurantId)
       .maybeSingle(),
     createSupabaseServerClient(),
@@ -129,6 +130,28 @@ export async function startPlanCheckout(input: {
   const email = user?.email?.trim();
   if (!email) throw new Error("Conta sem e-mail — não dá para criar cliente no Asaas.");
 
+  if (restaurant.owner_user_id !== user?.id) throw new Error("Loja não autorizada.");
+  const claim = await admin.from("checkout_attempts").insert({
+    restaurant_id: input.restaurantId, plan_slug: input.planSlug, billing_type: input.billingType,
+  });
+  if (claim.error) {
+    if (claim.error.code !== "23505") throw claim.error;
+    const existing = await admin.from("checkout_attempts").select("state, result, plan_slug, billing_type")
+      .eq("restaurant_id", input.restaurantId).single();
+    if (existing.error) throw existing.error;
+    if (existing.data.state === "completed" && existing.data.result &&
+        existing.data.plan_slug === input.planSlug && existing.data.billing_type === input.billingType) {
+      return existing.data.result as CheckoutResult;
+    }
+    throw new Error("Já existe uma assinatura ou tentativa pendente. Concilie antes de criar outra.");
+  }
+  try {
+    const current = await admin.from("subscriptions").select("asaas_subscription_id")
+      .eq("restaurant_id", input.restaurantId).maybeSingle();
+    if (current.error) throw current.error;
+    if (current.data?.asaas_subscription_id) {
+      throw new Error("Já existe uma assinatura Asaas. Revise a assinatura existente antes de criar outra.");
+    }
   let customerId = restaurant.asaas_customer_id as string | null;
   if (!customerId) {
     const existing = await findAsaasCustomerByExternalReference(input.restaurantId);
@@ -150,12 +173,12 @@ export async function startPlanCheckout(input: {
         asaas_customer_id: customerId,
         billing_cpf_cnpj: cpfCnpj,
       })
-      .eq("id", input.restaurantId);
+      .eq("id", input.restaurantId).throwOnError();
   } else if (!restaurant.billing_cpf_cnpj) {
     await admin
       .from("restaurants")
       .update({ billing_cpf_cnpj: cpfCnpj })
-      .eq("id", input.restaurantId);
+      .eq("id", input.restaurantId).throwOnError();
   }
 
   const subscription = await createAsaasSubscription({
@@ -176,12 +199,13 @@ export async function startPlanCheckout(input: {
     null;
 
   // Não libera o plano novo aqui — só grava IDs Asaas + pending. Ativação no webhook.
-  const { data: existingSub } = await admin
+  const { data: existingSub, error: existingSubError } = await admin
     .from("subscriptions")
     .select("id")
     .eq("restaurant_id", input.restaurantId)
     .maybeSingle();
 
+  if (existingSubError) throw existingSubError;
   if (!existingSub) {
     await admin.rpc("apply_subscription_plan", {
       p_restaurant_id: input.restaurantId,
@@ -191,7 +215,7 @@ export async function startPlanCheckout(input: {
       p_asaas_customer_id: customerId,
       p_billing_type: input.billingType,
       p_last_payment_id: firstPayment?.id ?? null,
-    });
+    }).throwOnError();
   }
 
   await admin
@@ -205,9 +229,9 @@ export async function startPlanCheckout(input: {
       last_payment_at: firstPayment?.id ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     })
-    .eq("restaurant_id", input.restaurantId);
+    .eq("restaurant_id", input.restaurantId).throwOnError();
 
-  return {
+  const result: CheckoutResult = {
     ok: true,
     configured: true,
     subscriptionId: subscription.id,
@@ -215,7 +239,15 @@ export async function startPlanCheckout(input: {
     invoiceUrl,
     billingType: input.billingType,
     planSlug: input.planSlug,
-  };
+  };  const saved = await admin.from("checkout_attempts").update({ state: "completed", result })
+    .eq("restaurant_id", input.restaurantId).eq("state", "started").select("restaurant_id").single();
+  if (saved.error || !saved.data) throw new Error("Assinatura criada; confirmação local pendente de conciliação.");
+  return result;
+  } catch (error) {
+    await admin.from("checkout_attempts").update({ state: "uncertain" })
+      .eq("restaurant_id", input.restaurantId).eq("state", "started");
+    throw error;
+  }
 }
 
 type AsaasWebhookBody = {

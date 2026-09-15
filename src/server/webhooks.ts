@@ -129,7 +129,7 @@ export async function handleStopOffers(message: MetaInboundMessage, restaurantId
   const job = await findAwaitingJob(message, restaurantId);
 
   if (job) {
-    await admin
+    const changed = await admin
       .from("customers")
       .update({
         opt_in: false,
@@ -139,6 +139,7 @@ export async function handleStopOffers(message: MetaInboundMessage, restaurantId
       })
       .eq("id", job.customer_id)
       .eq("restaurant_id", restaurantId);
+    if (changed.error) throw changed.error;
 
     await admin
       .from("campaign_jobs")
@@ -150,15 +151,11 @@ export async function handleStopOffers(message: MetaInboundMessage, restaurantId
     return { ok: true as const, campaignJobId: job.id };
   }
 
-  const { data: customers } = await admin
-    .from("customers")
-    .select("id, phone")
-    .eq("restaurant_id", restaurantId)
-    .limit(200);
-
-  const match = (customers ?? []).find((row) => phonesMatch(row.phone, message.from));
+  const { data: match, error: lookupError } = await admin.from("customers").select("id, phone")
+    .eq("restaurant_id", restaurantId).eq("phone", `+${digitsOnly(message.from)}`).maybeSingle();
+  if (lookupError) throw lookupError;
   if (match) {
-    await admin
+    const changed = await admin
       .from("customers")
       .update({
         opt_in: false,
@@ -168,6 +165,7 @@ export async function handleStopOffers(message: MetaInboundMessage, restaurantId
       })
       .eq("id", match.id)
       .eq("restaurant_id", restaurantId);
+    if (changed.error) throw changed.error;
     return { ok: true as const, customerId: match.id };
   }
 
@@ -192,30 +190,15 @@ export async function handleOptInConfirmation(message: MetaInboundMessage, resta
   const job = await findAwaitingJob(message, restaurantId);
   if (!job) return { enqueued: false as const, reason: "job_not_found" as const };
 
-  if (job.status === "offer_sent" || job.status === "confirmed") {
+  if (job.status === "offer_sent") {
     return { enqueued: false as const, reason: "already_processed" as const };
   }
 
-  await admin
-    .from("customers")
-    .update({
-      opt_in: true,
-      opt_in_at: new Date().toISOString(),
-      opt_in_source: "confirmacao_whatsapp",
-      opt_in_proof: `wamid:${message.id}`,
-    })
-    .eq("id", job.customer_id)
-    .eq("restaurant_id", restaurantId);
-
-  await admin
-    .from("campaign_jobs")
-    .update({
-      status: "confirmed",
-      confirmed_at: new Date().toISOString(),
-    })
-    .eq("id", job.id)
-    .eq("restaurant_id", restaurantId)
-    .eq("status", job.status);
+  const confirmed = await admin.rpc("confirm_campaign_offer", {
+    p_restaurant_id: restaurantId, p_job_id: job.id, p_phone: message.from,
+  });
+  if (confirmed.error) throw confirmed.error;
+  if (!confirmed.data) return { enqueued: false as const, reason: "consent_or_job_invalid" as const };
 
   if (!isRedisConfigured()) {
     return { enqueued: false as const, reason: "redis_missing" as const, campaignJobId: job.id };
@@ -251,28 +234,24 @@ export async function handleOptInConfirmation(message: MetaInboundMessage, resta
 async function findAwaitingJob(message: MetaInboundMessage, restaurantId: string) {
   if (message.context?.id) {
     const byContext = await loadJobRow({ optin_wamid: message.context.id }, restaurantId);
-    if (byContext) return byContext;
+    if (byContext && phonesMatch(byContext.customer.phone, message.from)) return byContext;
     const byProvider = await loadJobRow({ provider_message_id: message.context.id }, restaurantId);
-    if (byProvider) return byProvider;
+    if (byProvider && phonesMatch(byProvider.customer.phone, message.from)) return byProvider;
   }
 
   const admin = createSupabaseAdminClient();
   if (!admin) return null;
 
-  const { data: rows } = await admin
-    .from("campaign_jobs")
-    .select(jobSelect())
-    .eq("restaurant_id", restaurantId)
-    .in("status", AWAITING)
-    .order("sent_at", { ascending: false })
-    .limit(50);
-
-  const list = (rows ?? []) as unknown as JobRow[];
-  const match = list.find((row) => {
-    const customer = asOne(row.customers);
-    return customer?.phone ? phonesMatch(customer.phone, message.from) : false;
-  });
-
+  const customerResult = await admin.from("customers").select("id")
+    .eq("restaurant_id", restaurantId).eq("phone", `+${digitsOnly(message.from)}`).maybeSingle();
+  if (customerResult.error) throw customerResult.error;
+  if (!customerResult.data) return null;
+  const { data: rows, error } = await admin.from("campaign_jobs").select(jobSelect())
+    .eq("restaurant_id", restaurantId).eq("customer_id", customerResult.data.id)
+    .in("status", [...AWAITING, "confirmed"])
+    .order("sent_at", { ascending: false }).limit(1);
+  if (error) throw error;
+  const match = rows?.[0] as unknown as JobRow | undefined;
   return match ? await hydrateJob(match) : null;
 }
 

@@ -30,6 +30,7 @@ export async function postWhatsAppMessage(input: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input.payload),
+    signal: AbortSignal.timeout(20_000),
   });
 
   const body = (await response.json()) as GraphError & {
@@ -43,5 +44,7 @@ export async function postWhatsAppMessage(input: {
     );
   }
 
-  return body.messages?.[0]?.id ?? null;
+  const wamid = body.messages?.[0]?.id;
+  if (!wamid) throw new Error("Resposta de envio sem identificação; conciliação necessária.");
+  return wamid;
 }

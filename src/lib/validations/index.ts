@@ -109,6 +109,7 @@ export const upsertCustomerSchema = z
     optIn: z.boolean(),
     optInSource: z.enum(OPT_IN_SOURCES).optional(),
     optInProof: z.string().trim().max(120).optional(),
+    restoreConsentRevokedAt: z.string().datetime({ offset: true }).optional(),
   })
   .superRefine((value, ctx) => {
     if (!value.optIn) return;

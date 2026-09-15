@@ -22,3 +22,4 @@
 
 export { listImportTemplates, matchImportTemplate, IMPORT_TEMPLATES } from "./registry";
 export type { ImportTemplate, TemplateMatchInput } from "./types";
+export { headersFromGrid } from "./types";

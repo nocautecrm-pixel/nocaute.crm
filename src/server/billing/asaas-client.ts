@@ -50,6 +50,7 @@ async function asaasFetch<T>(path: string, init: AsaasRequestInit = {}): Promise
     },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
   });
 
   const text = await response.text();

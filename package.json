@@ -17,7 +17,9 @@
     "setup:db": "node --env-file=.env.local scripts/run-migrations.mjs",
     "setup:user": "node --env-file=.env.local scripts/create-bootstrap-user.mjs",
     "setup:store": "node --env-file=.env.local scripts/bootstrap-restaurant.mjs",
-    "setup:verify": "node --env-file=.env.local scripts/verify-supabase.mjs"
+    "setup:verify": "node --env-file=.env.local scripts/verify-supabase.mjs",
+    "test": "node --test tests/security.test.cjs tests/database.test.mjs",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -34,6 +36,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

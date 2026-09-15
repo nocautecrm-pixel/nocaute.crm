@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isDemoMode, isMetaConfigured, isRedisConfigured } from "@/lib/config";
+import { isDemoMode, isRedisConfigured } from "@/lib/config";
 import { getWebhookIngestQueue } from "@/lib/queue/queues";
 import { verifyMetaSignature } from "@/lib/whatsapp/signature";
 import { ingestWhatsAppPayload } from "@/server/webhooks";
