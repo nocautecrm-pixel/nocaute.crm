@@ -16,6 +16,7 @@ import {
 import { matchesAudienceDays } from "@/lib/audiences/defaults";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { digitsOnly, normalizeToE164 } from "@/lib/whatsapp/phone";
+import { eraseRestaurantCustomerBase } from "@/server/compliance/erasure";
 import type { Customer, CustomerRow, RecencySegment } from "@/types/database";
 
 const DEMO_CUSTOMERS_COOKIE = "nocaute_customers";
@@ -621,14 +622,9 @@ export async function deleteAllCustomers(restaurantId: string) {
   const admin = createSupabaseAdminClient();
   if (!admin) throw new Error("Supabase admin indisponível.");
 
-  const { data, error } = await admin
-    .from("customers")
-    .delete()
-    .eq("restaurant_id", restaurantId)
-    .select("id");
-  if (error) throw error;
+  const { deletedCustomers } = await eraseRestaurantCustomerBase(admin, restaurantId);
   await clearCustomersImportedAt(restaurantId);
-  return { ok: true as const, deleted: (data ?? []).length };
+  return { ok: true as const, deleted: deletedCustomers };
 }
 
 export async function registerVisit(restaurantId: string, customerId: string) {

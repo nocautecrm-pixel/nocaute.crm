@@ -1,6 +1,7 @@
 "use client";
 
 import Script from "next/script";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FirstStepOnboarding } from "@/components/configuracoes/FirstStepOnboarding";
 import { useEmbeddedSignup } from "@/components/integracao/useEmbeddedSignup";
@@ -11,6 +12,7 @@ import {
   eyebrowClass,
   insetClass,
 } from "@/components/ui/tokens";
+import type { WhatsAppOnboardingMode } from "@/lib/whatsapp/onboarding-mode";
 import { formatWhatsAppPhone } from "@/lib/whatsapp/display";
 import type { WhatsAppConnection } from "@/types/store";
 
@@ -25,6 +27,7 @@ export function WhatsAppConnectPanel({
   bare?: boolean;
 }) {
   const router = useRouter();
+  const [reconnectMode, setReconnectMode] = useState<WhatsAppOnboardingMode | null>(null);
   const signup = useEmbeddedSignup(connection, () => {
     onConnected?.();
     router.refresh();
@@ -56,7 +59,7 @@ export function WhatsAppConnectPanel({
         <section className={shell}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className={eyebrowClass}>WhatsApp da loja</p>
+              <p className={eyebrowClass}>WhatsApp da Meta</p>
               <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-900">
                 Linkado com a Meta
               </h2>
@@ -85,18 +88,46 @@ export function WhatsAppConnectPanel({
           </dl>
 
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-            Número errado ou teste (+1 555)? Reconecta e no popup escolhe o WhatsApp Business do
-            celular (QR), não “adicionar número novo”.
+            Para reconectar, escolha de novo como quer abrir a Meta (já usa no celular ou número
+            novo).
           </p>
+
+          <div className="mt-3 grid grid-cols-1 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setReconnectMode("existing")}
+              className={`rounded-lg border px-2.5 py-2 text-left text-[11px] font-semibold ${
+                reconnectMode === "existing"
+                  ? "border-emerald-400 bg-emerald-50 text-emerald-900"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Já uso o WhatsApp da Meta (QR)
+            </button>
+            <button
+              type="button"
+              onClick={() => setReconnectMode("new")}
+              className={`rounded-lg border px-2.5 py-2 text-left text-[11px] font-semibold ${
+                reconnectMode === "new"
+                  ? "border-emerald-400 bg-emerald-50 text-emerald-900"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Cadastrar número novo na Meta (SMS)
+            </button>
+          </div>
 
           <div className="mt-auto flex flex-col gap-2 pt-3">
             <button
               type="button"
-              onClick={signup.connect}
-              disabled={signup.connectDisabled}
+              onClick={() => {
+                if (!reconnectMode) return;
+                void signup.connect(reconnectMode);
+              }}
+              disabled={signup.connectDisabled || !reconnectMode}
               className={`${btnSecondaryClass} w-full`}
             >
-              {signup.connectLabel}
+              {!reconnectMode ? "Escolha como reconectar" : signup.connectLabel}
             </button>
             <button
               type="button"
@@ -114,7 +145,9 @@ export function WhatsAppConnectPanel({
           connectLabel={signup.connectLabel}
           connectDisabled={signup.connectDisabled}
           connected={false}
-          onConnect={signup.connect}
+          onConnect={(mode) => {
+            void signup.connect(mode);
+          }}
           bare={bare}
         />
       )}

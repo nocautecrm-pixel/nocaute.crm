@@ -1,26 +1,33 @@
 "use client";
 
-import { QrCode, Smartphone, Store } from "lucide-react";
+import { useState } from "react";
+import { MessageSquarePlus, QrCode } from "lucide-react";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { btnPrimaryClass, cardClass, eyebrowClass } from "@/components/ui/tokens";
+import type { WhatsAppOnboardingMode } from "@/lib/whatsapp/onboarding-mode";
 
-const POPUP_STEPS = [
+const PATHS: Array<{
+  id: WhatsAppOnboardingMode;
+  title: string;
+  hint: string;
+  detail: string;
+  icon: typeof QrCode;
+}> = [
   {
-    icon: Store,
-    title: "1. Portfólio da loja",
-    hint: "Escolhe o Business da casa (ex.: Com Limão e Sal).",
-  },
-  {
-    icon: Smartphone,
-    title: "2. Ligar o app do celular",
-    hint: "Tem de aparecer “conectar WhatsApp Business existente / app”. Não escolhas “adicionar número” nem a WABA vazia antiga.",
-  },
-  {
+    id: "existing",
+    title: "Já uso o WhatsApp da Meta no celular",
+    hint: "Ligar o número que a loja já usa (QR no WhatsApp Business).",
+    detail: "Não cria número novo. Não deve pedir SMS.",
     icon: QrCode,
-    title: "3. QR no WhatsApp Business",
-    hint: "O telemóvel mostra QR ou pedido no app. Não pedimos SMS para “criar” o número — ele já existe.",
   },
-] as const;
+  {
+    id: "new",
+    title: "Ainda não tenho número na Meta",
+    hint: "Cadastrar um número novo no WhatsApp oficial da Meta.",
+    detail: "A Meta pode pedir SMS ou ligação para confirmar o número.",
+    icon: MessageSquarePlus,
+  },
+];
 
 export function FirstStepOnboarding({
   connecting,
@@ -34,18 +41,21 @@ export function FirstStepOnboarding({
   connectLabel: string;
   connectDisabled: boolean;
   connected: boolean;
-  onConnect: () => void;
+  onConnect: (mode: WhatsAppOnboardingMode) => void;
   bare?: boolean;
 }) {
+  const [mode, setMode] = useState<WhatsAppOnboardingMode | null>(null);
+  const canOpen = Boolean(mode) && !connectDisabled && !connecting;
+
   return (
     <section
       className={`${bare ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4" : `${cardClass} flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4`}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className={`${eyebrowClass} text-emerald-700`}>WhatsApp oficial</p>
+          <p className={`${eyebrowClass} text-emerald-700`}>WhatsApp da Meta</p>
           <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-900">
-            Conectar a loja
+            Como quer conectar?
           </h2>
         </div>
         <span
@@ -56,61 +66,89 @@ export function FirstStepOnboarding({
           }`}
         >
           <StatusDot tone={connected ? "live" : "pending"} />
-          {connected ? "Conectado" : "Coexistência"}
+          {connected ? "Conectado" : "Escolha 1 opção"}
         </span>
       </div>
 
       <p className="mt-3 text-[12px] leading-relaxed text-slate-600">
-        O Nocaute <span className="font-semibold text-slate-800">não cria</span> um WhatsApp novo:
-        liga o que a loja já usa no celular à Cloud API (coexistência). Tudo no popup — sem abrir o
-        Business Manager.
+        Isto abre a janela oficial da <span className="font-semibold text-slate-800">Meta</span>. O
+        Nocaute só guarda o link da loja — o WhatsApp continua sendo da Meta.
       </p>
 
-      <ol className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
-        {POPUP_STEPS.map((step) => {
-          const Icon = step.icon;
+      <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {PATHS.map((path) => {
+          const Icon = path.icon;
+          const selected = mode === path.id;
           return (
-            <li
-              key={step.title}
-              className="flex gap-2.5 rounded-lg border border-slate-200/70 bg-slate-50/60 px-2.5 py-2"
+            <button
+              key={path.id}
+              type="button"
+              onClick={() => setMode(path.id)}
+              className={`flex w-full gap-2.5 rounded-lg border px-2.5 py-2 text-left transition ${
+                selected
+                  ? "border-emerald-400 bg-emerald-50/90 ring-1 ring-emerald-300"
+                  : "border-slate-200/70 bg-slate-50/60 hover:border-slate-300"
+              }`}
             >
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700">
+              <span
+                className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
+                  selected
+                    ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                    : "border-slate-200 bg-white text-slate-600"
+                }`}
+              >
                 <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
               </span>
-              <div className="min-w-0">
-                <p className="text-[12px] font-semibold tracking-tight text-slate-900">{step.title}</p>
-                <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{step.hint}</p>
-              </div>
-            </li>
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold tracking-tight text-slate-900">
+                  {path.title}
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-slate-600">
+                  {path.hint}
+                </span>
+                <span className="mt-0.5 block text-[10px] leading-snug text-slate-500">
+                  {path.detail}
+                </span>
+              </span>
+            </button>
           );
         })}
-      </ol>
-
-      <div className="mt-3 rounded-lg border border-amber-200/90 bg-amber-50/80 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
-        <p className="font-semibold">Se a Meta disser “app do parceiro sem permissões” (#2655111)</p>
-        <p className="mt-0.5 text-amber-900/90">
-          Falta <span className="font-semibold">App Review</span> no app Nocaute CRM: Advanced Access de{" "}
-          <span className="font-semibold">whatsapp_business_messaging</span> e{" "}
-          <span className="font-semibold">whatsapp_business_management</span>. Sem isso o QR não abre —
-          não é falha do telemóvel nem do SMS.
-        </p>
       </div>
 
-      <div className="mt-2 rounded-lg border border-rose-200/90 bg-rose-50/80 px-2.5 py-2 text-[11px] leading-snug text-rose-950">
-        <p className="font-semibold">Se a Meta pedir “Enviar código de verificação” (SMS)</p>
-        <p className="mt-0.5 text-rose-900/90">
-          Número Cloud criado no fluxo errado. Apaga esse telefone na WABA e reconecta pelo{" "}
-          <span className="font-semibold">app / QR</span>, não por “adicionar número”.
-        </p>
-      </div>
+      {mode === "existing" ? (
+        <div className="mt-2 rounded-lg border border-amber-200/90 bg-amber-50/80 px-2.5 py-2 text-[11px] leading-snug text-amber-950">
+          <p className="font-semibold">No popup da Meta</p>
+          <p className="mt-0.5 text-amber-900/90">
+            Escolha ligar o <span className="font-semibold">WhatsApp Business do celular</span> (QR).
+            Se pedir SMS, está no caminho errado — volte e use esta opção de novo com cuidado.
+          </p>
+        </div>
+      ) : null}
+
+      {mode === "new" ? (
+        <div className="mt-2 rounded-lg border border-sky-200/90 bg-sky-50/80 px-2.5 py-2 text-[11px] leading-snug text-sky-950">
+          <p className="font-semibold">Número novo na Meta</p>
+          <p className="mt-0.5 text-sky-900/90">
+            SMS é normal neste caminho. Se o número <span className="font-semibold">já está</span> no
+            WhatsApp Business do celular, use a outra opção (QR).
+          </p>
+        </div>
+      ) : null}
 
       <button
         type="button"
-        onClick={onConnect}
-        disabled={connectDisabled}
+        onClick={() => {
+          if (!mode) return;
+          onConnect(mode);
+        }}
+        disabled={!canOpen}
         className={`mt-3 w-full shrink-0 ${btnPrimaryClass}`}
       >
-        {connecting ? "Abrindo a Meta…" : connectLabel}
+        {connecting
+          ? "Abrindo a Meta…"
+          : !mode
+            ? "Escolha uma opção acima"
+            : connectLabel}
       </button>
     </section>
   );

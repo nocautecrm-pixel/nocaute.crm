@@ -40,7 +40,7 @@ export default async function ConfiguracoesPage() {
             title="WhatsApp Meta"
             done={connected}
             doneLabel="WhatsApp Meta etapa realizada"
-            pendingHint="Popup da Meta · QR no celular"
+            pendingHint="Escolha: já uso no celular ou número novo"
           >
             <WhatsAppConnectPanel bare connection={store.whatsapp} />
           </StageCard>
@@ -55,17 +55,29 @@ export default async function ConfiguracoesPage() {
               {connected ? (
                 <>
                   <p className="text-sm text-[#667781]">Número e nome já vieram da Meta.</p>
-                  <Link
-                    href="/clientes"
-                    className="inline-flex h-9 shrink-0 items-center rounded-lg border border-[#E9EDEF] bg-white px-3 text-sm font-semibold text-[#111B21]"
-                  >
-                    Base de Clientes
-                  </Link>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Link
+                      href="/pagamento-meta"
+                      className="inline-flex h-9 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-semibold text-emerald-900"
+                    >
+                      Pagamento Meta
+                    </Link>
+                    <Link
+                      href="/clientes"
+                      className="inline-flex h-9 items-center rounded-lg border border-[#E9EDEF] bg-white px-3 text-sm font-semibold text-[#111B21]"
+                    >
+                      Base de Clientes
+                    </Link>
+                  </div>
                 </>
               ) : (
                 <p className="text-sm text-[#667781]">
-                  No passo 2 abre o popup da Meta (QR no celular). O número da loja aparece aqui
-                  depois.
+                  No passo 2 escolha como conectar o WhatsApp da Meta. O número aparece aqui
+                  depois. O cartão das mensagens fica em{" "}
+                  <Link href="/pagamento-meta" className="font-semibold text-emerald-800 underline-offset-2 hover:underline">
+                    Pagamento Meta
+                  </Link>
+                  .
                 </p>
               )}
             </div>

@@ -19,7 +19,14 @@ type PhoneNode = {
   display_phone_number?: string;
   verified_name?: string;
   quality_rating?: string;
+  /** VERIFIED | NOT_VERIFIED | EXPIRED — SMS/OTP Cloud; coexistência já vem VERIFIED. */
+  code_verification_status?: string | null;
+  is_on_biz_app?: boolean | null;
+  platform_type?: string | null;
 };
+
+const UNVERIFIED_PHONE_HINT =
+  "Este número ficou na Meta como Cloud API “por verificar” (SMS). Isso acontece quando se escolhe adicionar número novo em vez de ligar o WhatsApp Business do telemóvel. O SMS falha se o número já está no app. Na Meta: apaga este número da WABA (ou ignora-o) e no Nocaute reconecta escolhendo “conectar app / QR”, não “adicionar número”.";
 
 function graphBase() {
   return `https://graph.facebook.com/${getGraphVersion()}`;
@@ -119,11 +126,7 @@ export async function resolveWhatsAppAssets(
 ): Promise<WhatsAppCloudAssets> {
   const wabaId = await resolveWabaId(accessToken, hints.wabaId);
   const phones = await listWabaPhoneNumbers(wabaId, accessToken);
-  const selected = phones.find((phone) => phone.id === hints.phoneNumberId) ?? phones[0];
-
-  if (!selected?.id) {
-    throw new Error("A WABA autorizada não possui número de telefone.");
-  }
+  const selected = pickReadyPhoneNumber(phones, hints.phoneNumberId);
 
   await subscribeAppToWaba(wabaId, accessToken);
   await assertAppSubscribed(wabaId, accessToken);
@@ -136,6 +139,42 @@ export async function resolveWhatsAppAssets(
     qualityRating: selected.quality_rating ?? null,
     metaUserId: await fetchMetaUserId(accessToken),
   };
+}
+
+function isPhoneVerified(phone: PhoneNode) {
+  const status = (phone.code_verification_status ?? "").toUpperCase();
+  // Campo ausente: contas antigas / coexistência já ligadas — não bloqueia.
+  if (!status) return true;
+  return status === "VERIFIED";
+}
+
+function isCoexistencePhone(phone: PhoneNode) {
+  return phone.is_on_biz_app === true;
+}
+
+/**
+ * Preferência: hint verificado → coexistência (app) → qualquer VERIFIED.
+ * Recusa gravar número preso em SMS/OTP (o painel Meta mostra “Enviar código”).
+ */
+export function pickReadyPhoneNumber(phones: PhoneNode[], hintedId?: string): PhoneNode {
+  if (!phones.length) {
+    throw new Error("A WABA autorizada não possui número de telefone.");
+  }
+
+  const hinted = hintedId ? phones.find((phone) => phone.id === hintedId) : undefined;
+  if (hinted && isPhoneVerified(hinted)) return hinted;
+
+  const coexistence = phones.find((phone) => isCoexistencePhone(phone) && isPhoneVerified(phone));
+  if (coexistence) return coexistence;
+
+  const verified = phones.find((phone) => isPhoneVerified(phone));
+  if (verified) return verified;
+
+  const stuck = hinted ?? phones[0];
+  const label = stuck.display_phone_number ?? stuck.id;
+  throw new Error(
+    `Número ${label} ainda não está verificado na Meta (code_verification_status=${stuck.code_verification_status ?? "NOT_VERIFIED"}). ${UNVERIFIED_PHONE_HINT}`,
+  );
 }
 
 async function resolveWabaId(accessToken: string, hintedWabaId?: string) {
@@ -209,8 +248,17 @@ async function listWabaIds(businessId: string, edge: string, accessToken: string
 }
 
 async function listWabaPhoneNumbers(wabaId: string, accessToken: string) {
+  const fields = [
+    "id",
+    "display_phone_number",
+    "verified_name",
+    "quality_rating",
+    "code_verification_status",
+    "is_on_biz_app",
+    "platform_type",
+  ].join(",");
   const payload = await graphGet<{ data?: PhoneNode[] }>(
-    `/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating`,
+    `/${wabaId}/phone_numbers?fields=${fields}`,
     accessToken,
   );
   return payload.data ?? [];
