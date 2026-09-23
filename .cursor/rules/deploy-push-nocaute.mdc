@@ -1,0 +1,46 @@
+---
+description: Nocaute only — publish online via npm run deploy/push (nocautecrm-pixel); never Altercadia
+alwaysApply: true
+---
+
+# Publicação Nocaute (segmentado)
+
+Este workspace é **somente Nocaute CRM**.
+- GitHub: **nocautecrm-pixel** / repo `nocaute.crm`
+- **Nunca** usar conta, remote ou fluxo **AltercadiaOnline**
+- O outro projeto (Altercadia) tem as próprias regras no **seu** workspace — não misturar
+
+## Frases que disparam publish automático
+
+Se o user pedir qualquer uma destas (ou equivalentes), **executar** o fluxo abaixo sem perguntar de novo se deve usar Nocaute:
+
+- “coloca online” / “por no online” / “publicar” / “deploy” / “push” / “sobe pra produção”
+
+## Fluxo obrigatório do agente
+
+1. Confirmar remote: `origin` → `nocautecrm-pixel/nocaute.crm` (se não for, parar e avisar).
+2. Commitar mudanças pendentes **deste repo** (sem `.env` / secrets), se houver.
+3. Produção = branch **`main`**: merge da feature em `main` se o trabalho não estiver nela.
+4. Publicar **só** com:
+   ```bash
+   npm run deploy
+   # ou
+   npm run push
+   ```
+5. Se o push der **403** / “denied to AltercadiaOnline”:
+   ```bash
+   gh auth switch --user nocautecrm-pixel
+   gh auth setup-git
+   npm run deploy
+   ```
+6. Não usar `git push` cru. Não usar token/conta Altercadia. Não copiar este fluxo para o outro projeto.
+
+| Comando | Uso |
+|---------|-----|
+| `npm run auth:github` | Só troca conta ativa |
+| `npm run push` | Auth Nocaute + `git push` |
+| `npm run deploy` | Auth Nocaute + `git push origin HEAD` |
+
+## Lembrete
+
+No fim de qualquer publish, 1 linha: próximo = `npm run push` / `npm run deploy`.
