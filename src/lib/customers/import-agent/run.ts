@@ -1,4 +1,5 @@
 import { detectImportKind } from "@/lib/customers/import-agent/detect";
+import { IMPORT_LIMITS } from "@/lib/customers/import-limits";
 import { extractCustomersFromLooseText } from "@/lib/customers/import-agent/loose-text";
 import {
   bytesToBase64,
@@ -36,6 +37,7 @@ function finish(
   notes: string[],
   options?: { aiUsed?: boolean; templateLabel?: string },
 ): ImportAgentResult {
+  if (parsed.rows.length > IMPORT_LIMITS.customers) throw new Error("Máximo 5.000 clientes por importação.");
   if (parsed.rows.length === 0) {
     throw new Error(
       notes[0] ??
@@ -230,6 +232,7 @@ export async function runCustomerImportAgent(input: {
   mime?: string;
   bytes: Uint8Array;
 }): Promise<ImportAgentResult> {
+  if (input.bytes.byteLength > IMPORT_LIMITS.bytes) throw new Error("Arquivo acima de 8 MB.");
   if (looksLikeLegacyXls(input.bytes)) {
     throw new Error("Excel antigo (.xls) não entra. Salve como .xlsx ou CSV e envie de novo.");
   }

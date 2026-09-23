@@ -7,7 +7,7 @@ import {
   remainingOf,
   type QuotaSnapshot,
 } from "@/lib/billing/plans";
-import { BackendUnavailableError, DEMO_RESTAURANT_ID, isDemoMode, requireLiveBackend } from "@/lib/config";
+import { BackendUnavailableError, isDemoMode, requireLiveBackend } from "@/lib/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   consumeCampaignLead,

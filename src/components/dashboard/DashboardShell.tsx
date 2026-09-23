@@ -11,6 +11,7 @@ import {
   Menu,
   Smartphone,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -32,6 +33,7 @@ const workLinks = [
 ];
 
 const billingLink = { href: "/plano", label: "Plano", icon: CreditCard };
+const metaBillingLink = { href: "/pagamento-meta", label: "Pagamento Meta", icon: Wallet };
 
 const viewCopy: Record<string, { title: string; hint: string }> = {
   "/visao-geral": {
@@ -57,6 +59,10 @@ const viewCopy: Record<string, { title: string; hint: string }> = {
   "/plano": {
     title: "Plano",
     hint: "Franquia da ferramenta. Cobrança automática ainda não está no ar.",
+  },
+  "/pagamento-meta": {
+    title: "Pagamento Meta",
+    hint: "Cartão da Meta para mensagens WhatsApp — não é a mensalidade do Nocaute.",
   },
 };
 
@@ -173,7 +179,14 @@ export function DashboardShell({
             ))}
           </div>
 
-          <div className="mt-auto border-t border-[#2A3942] pt-4">
+          <div className="mt-auto flex flex-col gap-1 border-t border-[#2A3942] pt-4">
+            <SideLink
+              href={metaBillingLink.href}
+              label={metaBillingLink.label}
+              icon={metaBillingLink.icon}
+              active={isActive(pathname, metaBillingLink.href)}
+              onClick={() => setOpen(false)}
+            />
             <SideLink
               href={billingLink.href}
               label={billingLink.label}

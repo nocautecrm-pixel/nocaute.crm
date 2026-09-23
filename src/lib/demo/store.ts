@@ -53,7 +53,7 @@ export function buildMetaHealth(input: {
       label: "Embedded Signup / app Meta",
       ok: signupConfigured,
       detail: signupConfigured
-        ? "App ID, secret, config id e token de webhook estão no servidor."
+        ? "App ID, secret, config id e token de webhook estão no servidor. Lojas externas também precisam de App Review (Advanced Access) no app Nocaute CRM."
         : "Faltam META_APP_ID, META_APP_SECRET, WEBHOOK_VERIFY_TOKEN ou o config id público do Embedded Signup.",
     },
     {

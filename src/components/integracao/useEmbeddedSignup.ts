@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useSyncedState } from "@/components/useSyncedState";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { META_CONNECTED_LABEL, META_DISCONNECTED_LABEL } from "@/lib/whatsapp/constants";
+import type { WhatsAppOnboardingMode } from "@/lib/whatsapp/onboarding-mode";
 import { humanizeMetaSignupError, isMetaAppReviewError } from "@/lib/whatsapp/signup-errors";
 import type { WhatsAppConnection } from "@/types/store";
 
@@ -51,33 +53,24 @@ export function useEmbeddedSignup(
 ) {
   const session = useRef<SessionInfo>({});
   const sdkInited = useRef(false);
+  const lastMode = useRef<WhatsAppOnboardingMode | null>(null);
   const [busy, setBusy] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [account, setAccount] = useState({
+  const incomingAccount = useMemo(() => ({
     connected: connection.connected,
     displayPhone: connection.displayPhone,
     verifiedName: connection.verifiedName,
     wabaId: connection.wabaId,
     phoneNumberId: connection.phoneNumberId,
     label: connection.label,
-  });
+  }), [connection]);
+  const [account, setAccount] = useSyncedState(incomingAccount);
 
   const appId = process.env.NEXT_PUBLIC_META_APP_ID?.trim();
   const configId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID?.trim();
   const officialLoginReady = Boolean(appId && configId);
-
-  useEffect(() => {
-    setAccount({
-      connected: connection.connected,
-      displayPhone: connection.displayPhone,
-      verifiedName: connection.verifiedName,
-      wabaId: connection.wabaId,
-      phoneNumberId: connection.phoneNumberId,
-      label: connection.label,
-    });
-  }, [connection]);
 
   const initFacebookSdk = useCallback(() => {
     if (sdkInited.current || !appId || !window.FB) return;
@@ -119,7 +112,7 @@ export function useEmbeddedSignup(
             typeof code === "string" || typeof code === "number"
               ? `${raw} (#${code})`
               : String(raw);
-          setError(humanizeMetaSignupError(combined));
+          setError(humanizeMetaSignupError(combined, { path: lastMode.current ?? undefined }));
           return;
         }
         // FINISH e FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING (coexistência) trazem os IDs.
@@ -148,7 +141,11 @@ export function useEmbeddedSignup(
     });
     const payload = (await response.json()) as SignupResult;
     if (!response.ok) {
-      throw new Error(humanizeMetaSignupError(payload.error ?? "Não foi possível conectar"));
+      throw new Error(
+        humanizeMetaSignupError(payload.error ?? "Não foi possível conectar", {
+          path: lastMode.current ?? undefined,
+        }),
+      );
     }
 
     setAccount({
@@ -186,9 +183,10 @@ export function useEmbeddedSignup(
     }
   }
 
-  async function connect() {
+  async function connect(mode: WhatsAppOnboardingMode = "existing") {
     setBusy(true);
     setError(null);
+    lastMode.current = mode;
     try {
       if (!officialLoginReady) {
         throw new Error("WhatsApp oficial da Meta não está configurado neste ambiente.");
@@ -197,17 +195,26 @@ export function useEmbeddedSignup(
         throw new Error("Login da Meta ainda carregando.");
       }
 
+      const extras =
+        mode === "existing"
+          ? {
+              setup: {},
+              // Coexistência: WhatsApp Business do celular (QR). Evita número Cloud + SMS.
+              featureType: "whatsapp_business_app_onboarding",
+              sessionInfoVersion: "3",
+            }
+          : {
+              setup: {},
+              // Número novo na Cloud API — a Meta pode pedir SMS/voz.
+              sessionInfoVersion: "3",
+            };
+
       const loginOptions = {
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
         fedCM: false,
-        extras: {
-          setup: {},
-          // Sem isto a Meta cria número Cloud “por verificar” (SMS). Com isto: app/QR.
-          featureType: "whatsapp_business_app_onboarding",
-          sessionInfoVersion: "3",
-        },
+        extras,
       };
 
       let finished = false;
@@ -230,7 +237,10 @@ export function useEmbeddedSignup(
         if (!code) {
           setError(
             humanizeMetaSignupError(
-              "Popup fechou sem ligar. Se a Meta mostrou erro de permissões do app parceiro (#2655111), falta App Review. Se pediu SMS, o número Cloud está inválido — usa app/QR.",
+              mode === "existing"
+                ? "Popup fechou sem ligar. Se pediu SMS, escolha no popup o WhatsApp Business do celular (QR), não número novo. Se viu #2655111, falta App Review."
+                : "Popup fechou sem ligar. Se a Meta mostrou #2655111, falta App Review. Confira o SMS/número e tente de novo.",
+              { path: mode },
             ),
           );
           stopBusy();
@@ -240,7 +250,7 @@ export function useEmbeddedSignup(
           .catch((err) => {
             setError(
               err instanceof Error
-                ? humanizeMetaSignupError(err.message)
+                ? humanizeMetaSignupError(err.message, { path: mode })
                 : "Falha na conexão",
             );
           })
@@ -274,8 +284,8 @@ export function useEmbeddedSignup(
       : officialLoginReady && !sdkReady
         ? "Carregando Meta…"
         : connected
-          ? "Reconectar"
-          : "Conectar WhatsApp da loja";
+          ? "Abrir de novo a Meta"
+          : "Abrir janela da Meta";
 
   return {
     account,

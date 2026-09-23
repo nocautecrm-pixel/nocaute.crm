@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSyncedState } from "@/components/useSyncedState";
 import { useRouter } from "next/navigation";
 import { StoreLogo } from "@/components/dashboard/StoreLogo";
 import {
@@ -48,12 +49,12 @@ export function StoreProfileForm({
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [storeName, setStoreName] = useState(name);
-  const [storeCity, setStoreCity] = useState(city);
-  const [menu, setMenu] = useState(menuUrl);
-  const [addr, setAddr] = useState(address);
-  const [hours, setHours] = useState(hoursText);
-  const [logo, setLogo] = useState<string | null>(logoUrl);
+  const [storeName, setStoreName] = useSyncedState(name);
+  const [storeCity, setStoreCity] = useSyncedState(city);
+  const [menu, setMenu] = useSyncedState(menuUrl);
+  const [addr, setAddr] = useSyncedState(address);
+  const [hours, setHours] = useSyncedState(hoursText);
+  const [logo, setLogo] = useSyncedState<string | null>(logoUrl);
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -61,18 +62,6 @@ export function StoreProfileForm({
   const lastStep = STEPS.length - 1;
   const current = STEPS[step];
   const canDisconnect = name.trim().length >= 2;
-
-  useEffect(() => {
-    setLogo(logoUrl);
-  }, [logoUrl]);
-
-  useEffect(() => {
-    setStoreName(name);
-    setStoreCity(city);
-    setMenu(menuUrl);
-    setAddr(address);
-    setHours(hoursText);
-  }, [name, city, menuUrl, address, hoursText]);
 
   async function onLogo(file: File | undefined) {
     if (!file) return;

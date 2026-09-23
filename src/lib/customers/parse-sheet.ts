@@ -1,3 +1,4 @@
+import { IMPORT_LIMITS as LIMIT } from "@/lib/customers/import-limits";
 import { normalizeOptInSource, type OptInSource } from "@/lib/customers/opt-in";
 import { normalizeToE164 } from "@/lib/whatsapp/phone";
 
@@ -45,6 +46,7 @@ function splitDelimitedLine(line: string, delimiter: string) {
   let current = "";
   let quoted = false;
   for (let i = 0; i < line.length; i += 1) {
+    if (out.length >= LIMIT.columns || current.length > LIMIT.cellChars) throw new Error("Linha CSV acima do limite.");
     const char = line[i];
     if (char === '"') {
       if (quoted && line[i + 1] === '"') {
@@ -60,6 +62,7 @@ function splitDelimitedLine(line: string, delimiter: string) {
       current += char;
     }
   }
+  if (out.length >= LIMIT.columns || current.length > LIMIT.cellChars) throw new Error("Linha CSV acima do limite.");
   out.push(current.trim());
   return out;
 }
@@ -294,7 +297,7 @@ function inferIndex(grid: string[][], kind: "phone" | "date" | "name") {
 }
 
 function detectDelimiter(sample: string) {
-  const line = sample.split(/\r?\n/).find((item) => item.trim()) ?? "";
+  const line = sample.slice(0, sample.indexOf("\n") < 0 ? sample.length : sample.indexOf("\n"));
   const counts = [
     { delimiter: ";", count: (line.match(/;/g) ?? []).length },
     { delimiter: "\t", count: (line.match(/\t/g) ?? []).length },
@@ -309,10 +312,18 @@ export function textToGrid(text: string): string[][] {
   const raw = text.replace(/^\uFEFF/, "").trim();
   if (!raw) return [];
   const delimiter = detectDelimiter(raw);
-  return raw
-    .split(/\r?\n/)
-    .map((line) => splitDelimitedLine(line, delimiter))
-    .filter((row) => row.some((cell) => cell.trim()));
+  if (raw.length > LIMIT.bytes) throw new Error("Texto acima do limite.");
+  const rows: string[][] = [];
+  let cells = 0;
+  let lines = 0;
+  for (const match of raw.matchAll(/[^\r\n]+/g)) {
+    if (++lines > LIMIT.rows) throw new Error("Texto com linhas demais.");
+    const row = splitDelimitedLine(match[0], delimiter);
+    cells += row.length;
+    if (cells > LIMIT.cells) throw new Error("Texto com células demais.");
+    if (row.some((cell) => cell.trim())) rows.push(row);
+  }
+  return rows;
 }
 
 function headerRowIndex(grid: string[][]) {

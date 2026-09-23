@@ -17,13 +17,19 @@
     "setup:db": "node --env-file=.env.local scripts/run-migrations.mjs",
     "setup:user": "node --env-file=.env.local scripts/create-bootstrap-user.mjs",
     "setup:store": "node --env-file=.env.local scripts/bootstrap-restaurant.mjs",
-    "setup:verify": "node --env-file=.env.local scripts/verify-supabase.mjs"
+    "setup:verify": "node --env-file=.env.local scripts/verify-supabase.mjs",
+    "auth:github": "node scripts/ensureNocauteGithubAuth.mjs",
+    "push": "node scripts/push.mjs",
+    "deploy": "node scripts/push.mjs origin HEAD",
+    "test": "node --test tests/security.test.cjs tests/database.test.mjs",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "bullmq": "^6.1.2",
     "date-fns": "^4.4.0",
+    "esbuild": "^0.28.2",
     "ioredis": "^6.0.0",
     "lucide-react": "^1.31.0",
     "next": "16.3.1",
@@ -34,6 +40,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

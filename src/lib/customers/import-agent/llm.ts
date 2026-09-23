@@ -1,4 +1,6 @@
-import { normalizeOptInSource, type OptInSource } from "@/lib/customers/opt-in";
+import { z } from "zod";
+import { readBoundedBody } from "@/lib/customers/import-limits";
+import { withImportBudget } from "@/server/compliance/import-budget";
 import {
   lastPurchaseFromDaysAgo,
   parseDate,
@@ -66,19 +68,16 @@ function normalizeAiRows(raw: AiRow[]): ParseCustomerResult {
       typeof item.orderCount === "number" && Number.isFinite(item.orderCount)
         ? Math.max(0, Math.floor(item.orderCount))
         : null;
-    const optInSource = item.optInSource ? normalizeOptInSource(String(item.optInSource)) : null;
-    const optInProof = item.optInProof ? String(item.optInProof).trim() || null : null;
-    const optIn = Boolean(item.optIn && optInSource && optInProof);
 
     collected.push({
       name: name.length >= 2 ? name : `Cliente ${phone.slice(-4)}`,
       phone,
       lastPurchaseAt,
       orderCount,
-      optIn,
-      optInAt: optIn ? lastPurchaseAt ?? new Date().toISOString() : null,
-      optInSource: optIn ? (optInSource as OptInSource) : null,
-      optInProof: optIn ? optInProof : null,
+      optIn: false,
+      optInAt: null,
+      optInSource: null,
+      optInProof: null,
     });
   }
 
@@ -114,32 +113,42 @@ Responde APENAS JSON:
 {"documentType":"customers"|"menu"|"mixed"|"unknown","customers":[{"name":"...","phone":"...","orderCount":null,"daysAgo":null,"lastPurchaseAt":null,"optIn":false,"optInSource":null,"optInProof":null}]}`;
 
 async function callChat(messages: unknown[]) {
+  return withImportBudget("ai", () => performChat(messages));
+}
+
+async function performChat(messages: unknown[]) {
+  const requestBody = JSON.stringify({
+    model: aiModel(), temperature: 0, max_tokens: 4096,
+    response_format: { type: "json_object" }, messages,
+  });
+  if (Buffer.byteLength(requestBody) > 11_000_000) throw new Error("Entrada de IA acima do limite.");
   const response = await fetch(`${aiBaseUrl().replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${aiKey()}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: aiModel(),
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages,
-    }),
+    body: requestBody,
+    signal: AbortSignal.timeout(30_000),
   });
-  const payload = (await response.json()) as {
+  const payload = JSON.parse(new TextDecoder().decode(await readBoundedBody(response.body, 256_000))) as {
     error?: { message?: string };
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ finish_reason?: string; message?: { content?: string } }>;
   };
   if (!response.ok) {
     throw new Error(payload.error?.message ?? `IA falhou (${response.status})`);
   }
   const content = payload.choices?.[0]?.message?.content;
   if (!content) throw new Error("IA sem resposta.");
-  const parsed = extractJsonObject(content) as {
-    documentType?: string;
-    customers?: AiRow[];
-  };
+  if (payload.choices?.[0]?.finish_reason === "length") throw new Error("Lista grande demais para IA; envie CSV/Excel.");
+  const parsed = z.object({
+    documentType: z.enum(["customers", "menu", "mixed", "unknown"]).optional(),
+    customers: z.array(z.object({
+      name: z.string().max(256).optional(), phone: z.string().max(40).optional(),
+      lastPurchaseAt: z.string().max(40).nullable().optional(),
+      daysAgo: z.number().finite().nullable().optional(), orderCount: z.number().finite().nullable().optional(),
+    })).max(5000),
+  }).parse(extractJsonObject(content));
   if (parsed.documentType === "menu" && (!parsed.customers || parsed.customers.length === 0)) {
     throw new Error(
       "Isto parece cardápio/produtos, não lista de clientes. Envie a base de clientes (nome + WhatsApp).",
@@ -152,12 +161,12 @@ export async function extractCustomersWithAiText(text: string): Promise<ParseCus
   if (!aiConfigured()) {
     throw new Error("IA de importação não configurada (OPENAI_API_KEY).");
   }
-  const clipped = text.length > 60_000 ? `${text.slice(0, 60_000)}\n…[cortado]` : text;
+  if (text.length > 60_000) throw new Error("Texto grande demais para IA; envie CSV/Excel.");
   return callChat([
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      content: `Interpreta este export e extrai clientes:\n\n${clipped}`,
+      content: `Interpreta este export e extrai clientes:\n\n${text}`,
     },
   ]);
 }
