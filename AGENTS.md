@@ -13,3 +13,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Nunca commitar `.env` / `.env.local`. Só `.env.example` sem valores reais.
 - Não pedir `SUPABASE_SERVICE_ROLE_KEY`, `META_APP_SECRET` ou `TOKEN_ENCRYPTION_KEY` no chat.
 - `TOKEN_ENCRYPTION_KEY` idêntica na Vercel e no worker Railway.
+
+## Publicar online (só este repo)
+
+- Conta GitHub: **nocautecrm-pixel** — nunca AltercadiaOnline.
+- Pedidos tipo “coloca online / publicar / deploy / push” → `npm run deploy` ou `npm run push` (ver `.cursor/rules/deploy-push-nocaute.mdc`).
+- Nunca `git push` cru neste workspace.

@@ -16,17 +16,27 @@ import path from "node:path";
 export const NOCAUTE_GH_USER = process.env.DEPLOY_GH_USER ?? "nocautecrm-pixel";
 
 export function ensureNocauteGithubAuth() {
-  const result = spawnSync("gh", ["auth", "switch", "--user", NOCAUTE_GH_USER], {
+  const switchResult = spawnSync("gh", ["auth", "switch", "--user", NOCAUTE_GH_USER], {
     stdio: "inherit",
     encoding: "utf8",
     shell: false,
   });
 
-  if (result.status !== 0) {
+  if (switchResult.status !== 0) {
     console.error(`[deploy] Conta GitHub ativa precisa ser "${NOCAUTE_GH_USER}".`);
     console.error("[deploy] Rode: gh auth login -h github.com -p https -w  (conta Nocaute)");
     console.error("[deploy] Depois: gh auth status  → Active account = nocautecrm-pixel");
     process.exit(1);
+  }
+
+  // Windows Credential Manager pode manter token Altercadia; força o git a usar o gh ativo.
+  const setupGit = spawnSync("gh", ["auth", "setup-git"], {
+    stdio: "inherit",
+    encoding: "utf8",
+    shell: false,
+  });
+  if (setupGit.status !== 0) {
+    console.warn("[deploy] gh auth setup-git falhou; se o push der 403 Altercadia, rode: gh auth setup-git");
   }
 
   console.log(`[deploy] GitHub ativo: ${NOCAUTE_GH_USER}`);
