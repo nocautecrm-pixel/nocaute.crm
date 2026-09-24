@@ -216,7 +216,7 @@ export function FirstStepOnboarding({
             ? "Detectando Facebook…"
             : metaBusy
               ? "Abrindo Meta…"
-              : "Usar Facebook deste navegador"}
+              : "CONECTAR LOJA NO META"}
         </button>
       ) : (
         <div className="flex w-full shrink-0 flex-col gap-2">

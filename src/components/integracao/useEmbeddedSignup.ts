@@ -496,11 +496,7 @@ export function useEmbeddedSignup(
       ? "Meta não configurada"
       : officialLoginReady && !sdkReady
         ? "Carregando Meta…"
-        : !metaLinked
-          ? "Entre na Meta primeiro"
-          : connected
-            ? "Abrir de novo a Meta"
-            : "Conectar WhatsApp da loja";
+        : "CONECTAR LOJA NO META";
 
   const recommendedMode: WhatsAppOnboardingMode =
     portfolio?.hasWhatsAppNumber === false && portfolio.limited === false
