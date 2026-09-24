@@ -13,6 +13,7 @@ import {
   insetClass,
 } from "@/components/ui/tokens";
 import type { WhatsAppOnboardingMode } from "@/lib/whatsapp/onboarding-mode";
+import { isWrongOnboardingPathError } from "@/lib/whatsapp/signup-errors";
 import { formatWhatsAppPhone } from "@/lib/whatsapp/display";
 import type { WhatsAppConnection } from "@/types/store";
 
@@ -27,11 +28,13 @@ export function WhatsAppConnectPanel({
   bare?: boolean;
 }) {
   const router = useRouter();
-  const [reconnectMode, setReconnectMode] = useState<WhatsAppOnboardingMode | null>(null);
+  const [reconnectMode, setReconnectMode] = useState<WhatsAppOnboardingMode>("existing");
+  const [showNewReconnect, setShowNewReconnect] = useState(false);
   const signup = useEmbeddedSignup(connection, () => {
     onConnected?.();
     router.refresh();
   });
+  const wrongPath = isWrongOnboardingPathError(signup.error);
 
   function confirmDisconnect() {
     const ok = window.confirm(
@@ -88,8 +91,8 @@ export function WhatsAppConnectPanel({
           </dl>
 
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-            Para reconectar, escolha de novo como quer abrir a Meta (já usa no celular ou número
-            novo).
+            Reconectar: use o mesmo número do WhatsApp Business do celular (QR). Não precisa
+            comprar outro chip.
           </p>
 
           <div className="mt-3 grid grid-cols-1 gap-1.5">
@@ -102,32 +105,41 @@ export function WhatsAppConnectPanel({
                   : "border-slate-200 bg-white text-slate-700"
               }`}
             >
-              Já uso o WhatsApp da Meta (QR)
+              Já uso no celular (QR) — recomendado
             </button>
-            <button
-              type="button"
-              onClick={() => setReconnectMode("new")}
-              className={`rounded-lg border px-2.5 py-2 text-left text-[11px] font-semibold ${
-                reconnectMode === "new"
-                  ? "border-emerald-400 bg-emerald-50 text-emerald-900"
-                  : "border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              Cadastrar número novo na Meta (SMS)
-            </button>
+            {showNewReconnect ? (
+              <button
+                type="button"
+                onClick={() => setReconnectMode("new")}
+                className={`rounded-lg border px-2.5 py-2 text-left text-[11px] font-semibold ${
+                  reconnectMode === "new"
+                    ? "border-sky-400 bg-sky-50 text-sky-900"
+                    : "border-slate-200 bg-white text-slate-700"
+                }`}
+              >
+                Número livre / novo na Cloud (SMS)
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowNewReconnect(true)}
+                className="rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-left text-[11px] font-medium text-slate-500 hover:border-slate-300"
+              >
+                Número novo na Cloud (avançado)…
+              </button>
+            )}
           </div>
 
           <div className="mt-auto flex flex-col gap-2 pt-3">
             <button
               type="button"
               onClick={() => {
-                if (!reconnectMode) return;
                 void signup.connect(reconnectMode);
               }}
-              disabled={signup.connectDisabled || !reconnectMode}
+              disabled={signup.connectDisabled}
               className={`${btnSecondaryClass} w-full`}
             >
-              {!reconnectMode ? "Escolha como reconectar" : signup.connectLabel}
+              {signup.connectLabel}
             </button>
             <button
               type="button"
@@ -156,13 +168,16 @@ export function WhatsAppConnectPanel({
         <div
           role="alert"
           className={`mt-2 rounded-lg border px-3 py-2 text-[12px] leading-snug ${
-            signup.appReviewBlocked
+            signup.appReviewBlocked || wrongPath
               ? "border-amber-300 bg-amber-50 text-amber-950"
               : "border-rose-200 bg-rose-50 text-rose-900"
           }`}
         >
           {signup.appReviewBlocked ? (
             <p className="mb-1 font-semibold tracking-tight">Falta App Review no app parceiro</p>
+          ) : null}
+          {wrongPath && !signup.appReviewBlocked ? (
+            <p className="mb-1 font-semibold tracking-tight">Caminho SMS em vez de QR</p>
           ) : null}
           <p>{signup.error}</p>
         </div>

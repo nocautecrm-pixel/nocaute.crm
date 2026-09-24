@@ -40,7 +40,7 @@ export default async function ConfiguracoesPage() {
             title="WhatsApp Meta"
             done={connected}
             doneLabel="WhatsApp Meta etapa realizada"
-            pendingHint="Escolha: já uso no celular ou número novo"
+            pendingHint="Recomendado: já uso no celular (mesmo número + QR)"
           >
             <WhatsAppConnectPanel bare connection={store.whatsapp} />
           </StageCard>
@@ -72,8 +72,8 @@ export default async function ConfiguracoesPage() {
                 </>
               ) : (
                 <p className="text-sm text-[#667781]">
-                  No passo 2 escolha como conectar o WhatsApp da Meta. O número aparece aqui
-                  depois. O cartão das mensagens fica em{" "}
+                  No passo 2 ligue o WhatsApp Business do celular (QR) — mesmo número, sem
+                  comprar chip. O cartão das mensagens fica em{" "}
                   <Link href="/pagamento-meta" className="font-semibold text-emerald-800 underline-offset-2 hover:underline">
                     Pagamento Meta
                   </Link>

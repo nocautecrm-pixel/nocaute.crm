@@ -238,8 +238,8 @@ export function useEmbeddedSignup(
           setError(
             humanizeMetaSignupError(
               mode === "existing"
-                ? "Popup fechou sem ligar. Se pediu SMS, escolha no popup o WhatsApp Business do celular (QR), não número novo. Se viu #2655111, falta App Review."
-                : "Popup fechou sem ligar. Se a Meta mostrou #2655111, falta App Review. Confira o SMS/número e tente de novo.",
+                ? "Popup fechou sem ligar. Use o Facebook da loja no Chrome; no popup escolha WhatsApp Business do celular (QR), não SMS/número novo. Mesmo número — sem comprar chip. Se viu #2655111, falta App Review."
+                : "Popup fechou sem ligar. Se a Meta mostrou #2655111, falta App Review. Número novo exige SMS e número livre; se já usa no celular, volte ao caminho QR.",
               { path: mode },
             ),
           );
