@@ -154,6 +154,8 @@ export function WhatsAppConnectPanel({
         <FirstStepOnboarding
           connecting={signup.busy}
           metaBusy={signup.metaBusy}
+          metaChecking={signup.metaChecking}
+          metaFromBrowser={signup.metaFromBrowser}
           connectLabel={signup.connectLabel}
           connectDisabled={signup.connectDisabled}
           metaDisabled={signup.metaDisabled}

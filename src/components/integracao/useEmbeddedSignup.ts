@@ -24,6 +24,7 @@ declare global {
     FB?: {
       init: (opts: Record<string, unknown>) => void;
       login: (cb: (response: FbLoginResponse) => void, opts: Record<string, unknown>) => void;
+      getLoginStatus: (cb: (response: FbLoginResponse) => void, roundtrip?: boolean) => void;
       api: (
         path: string,
         params: Record<string, unknown>,
@@ -102,15 +103,18 @@ export function useEmbeddedSignup(
   const lastMode = useRef<WhatsAppOnboardingMode | null>(null);
   const [busy, setBusy] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
+  const [metaChecking, setMetaChecking] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const autoSessionTried = useRef(false);
   const stored = readStoredMetaStep();
   const [metaLinked, setMetaLinked] = useState(
     Boolean(stored?.linked) || connection.connected,
   );
   const [metaName, setMetaName] = useState<string | null>(stored?.name ?? null);
   const [portfolio, setPortfolio] = useState<MetaPortfolioHint | null>(null);
+  const [metaFromBrowser, setMetaFromBrowser] = useState(false);
   const incomingAccount = useMemo(
     () => ({
       connected: connection.connected,
@@ -253,6 +257,49 @@ export function useEmbeddedSignup(
     }
   }
 
+  function adoptMetaToken(accessToken: string, fromBrowser: boolean) {
+    return new Promise<void>((resolve) => {
+      window.FB?.api("/me", { fields: "name" }, (me) => {
+        const name = me?.name ?? null;
+        setMetaLinked(true);
+        setMetaName(name);
+        setMetaFromBrowser(fromBrowser);
+        writeStoredMetaStep({ linked: true, name });
+        void fetchPortfolio(accessToken, name).finally(() => resolve());
+      });
+    });
+  }
+
+  /** Usa a sessão Facebook já aberta no navegador, se existir. */
+  function tryAdoptBrowserSession(opts?: { silent?: boolean }) {
+    return new Promise<boolean>((resolve) => {
+      if (!window.FB) {
+        resolve(false);
+        return;
+      }
+      window.FB.getLoginStatus((response) => {
+        const token = response.authResponse?.accessToken;
+        if (response.status === "connected" && token) {
+          void adoptMetaToken(token, true).then(() => resolve(true));
+          return;
+        }
+        resolve(false);
+      }, true);
+    });
+  }
+
+  useEffect(() => {
+    if (!sdkReady || !officialLoginReady || connection.connected) return;
+    if (autoSessionTried.current) return;
+    if (metaLinked && portfolio) return;
+    autoSessionTried.current = true;
+    setMetaChecking(true);
+    void tryAdoptBrowserSession({ silent: true }).finally(() => {
+      setMetaChecking(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when SDK becomes ready
+  }, [sdkReady, officialLoginReady, connection.connected]);
+
   async function linkMeta() {
     setMetaBusy(true);
     setError(null);
@@ -262,6 +309,12 @@ export function useEmbeddedSignup(
       }
       if (!window.FB || !sdkReady) {
         throw new Error("Login da Meta ainda carregando.");
+      }
+
+      const already = await tryAdoptBrowserSession({ silent: true });
+      if (already) {
+        setMetaBusy(false);
+        return;
       }
 
       let finished = false;
@@ -287,13 +340,7 @@ export function useEmbeddedSignup(
           return;
         }
 
-        window.FB?.api("/me", { fields: "name" }, (me) => {
-          const name = me?.name ?? null;
-          setMetaLinked(true);
-          setMetaName(name);
-          writeStoredMetaStep({ linked: true, name });
-          void fetchPortfolio(token, name).finally(() => stopBusy());
-        });
+        void adoptMetaToken(token, false).finally(() => stopBusy());
       }, {
         scope: "public_profile,email,business_management",
         return_scopes: true,
@@ -428,11 +475,17 @@ export function useEmbeddedSignup(
 
   const connected = account.connected;
   const metaDisabled =
-    metaBusy || busy || disconnecting || !officialLoginReady || (officialLoginReady && !sdkReady);
+    metaBusy ||
+    metaChecking ||
+    busy ||
+    disconnecting ||
+    !officialLoginReady ||
+    (officialLoginReady && !sdkReady);
   const connectDisabled =
     busy ||
     disconnecting ||
     metaBusy ||
+    metaChecking ||
     (!metaLinked && !connected) ||
     !officialLoginReady ||
     (officialLoginReady && !sdkReady);
@@ -458,6 +511,8 @@ export function useEmbeddedSignup(
     account,
     busy,
     metaBusy,
+    metaChecking,
+    metaFromBrowser,
     disconnecting,
     error,
     appReviewBlocked: isMetaAppReviewError(error),

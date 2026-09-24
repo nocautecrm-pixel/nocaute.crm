@@ -10,6 +10,8 @@ import type { MetaPortfolioHint } from "@/components/integracao/useEmbeddedSignu
 export function FirstStepOnboarding({
   connecting,
   metaBusy,
+  metaChecking,
+  metaFromBrowser,
   connectLabel,
   connectDisabled,
   metaDisabled,
@@ -24,6 +26,8 @@ export function FirstStepOnboarding({
 }: {
   connecting: boolean;
   metaBusy: boolean;
+  metaChecking: boolean;
+  metaFromBrowser: boolean;
   connectLabel: string;
   connectDisabled: boolean;
   metaDisabled: boolean;
@@ -66,15 +70,16 @@ export function FirstStepOnboarding({
             }`}
           >
             <StatusDot tone={connected || metaLinked ? "live" : "pending"} />
-            {connected ? "Pronto" : metaLinked ? "Passo 2" : "Passo 1"}
+            {connected ? "Pronto" : metaLinked ? "Passo 2" : metaChecking ? "Detectando…" : "Passo 1"}
           </span>
         </div>
 
         {!metaLinked ? (
           <>
             <p className="mt-2 text-[12px] leading-snug text-slate-600">
-              Primeiro entre com o <span className="font-semibold text-slate-800">Facebook da loja</span>.
-              Depois ligamos o WhatsApp do celular.
+              {metaChecking
+                ? "Procurando Facebook já aberto neste navegador…"
+                : "Se o Facebook da loja já estiver logado no Chrome, usamos essa conta. Se não, você entra na hora."}
             </p>
 
             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
@@ -83,9 +88,11 @@ export function FirstStepOnboarding({
                   <UserRound className="h-4 w-4" strokeWidth={1.75} />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-900">Entrar com Meta</p>
+                  <p className="text-[13px] font-semibold text-slate-900">
+                    {metaChecking ? "Detectando conta…" : "Conta Meta do navegador"}
+                  </p>
                   <p className="mt-0.5 text-[11px] leading-snug text-slate-600">
-                    Use a conta que gerencia a saladeria / restaurante — a mesma do celular da loja.
+                    A mesma conta que gerencia o restaurante e o celular da loja.
                   </p>
                 </div>
               </div>
@@ -94,9 +101,15 @@ export function FirstStepOnboarding({
         ) : (
           <>
             <p className="mt-2 text-[12px] leading-snug text-slate-600">
-              Conta Meta{metaName ? `: ` : " conectada"}
-              {metaName ? <span className="font-semibold text-slate-800">{metaName}</span> : null}.
-              Agora ligue o WhatsApp.
+              {metaFromBrowser ? "Usando o Facebook já logado neste navegador" : "Conta Meta"}
+              {metaName ? (
+                <>
+                  : <span className="font-semibold text-slate-800">{metaName}</span>
+                </>
+              ) : (
+                " conectada"
+              )}
+              . Agora ligue o WhatsApp.
             </p>
 
             {portfolio?.hasWhatsAppNumber && portfolio.displayPhone ? (
@@ -180,8 +193,7 @@ export function FirstStepOnboarding({
 
             {mode === "existing" ? (
               <p className="mt-3 text-[11px] leading-snug text-slate-500">
-                Na janela: Facebook da loja → ligar app do celular (QR). Se pedir SMS, feche e
-                tente de novo.
+                Na janela: ligar o app do celular (QR). Se pedir SMS, feche e tente de novo.
               </p>
             ) : (
               <p className="mt-3 text-[11px] leading-snug text-slate-500">
@@ -200,7 +212,11 @@ export function FirstStepOnboarding({
           disabled={metaDisabled}
           className={`w-full shrink-0 ${btnPrimaryClass}`}
         >
-          {metaBusy ? "Abrindo Meta…" : "Entrar com Meta"}
+          {metaChecking
+            ? "Detectando Facebook…"
+            : metaBusy
+              ? "Abrindo Meta…"
+              : "Usar Facebook deste navegador"}
         </button>
       ) : (
         <div className="flex w-full shrink-0 flex-col gap-2">
