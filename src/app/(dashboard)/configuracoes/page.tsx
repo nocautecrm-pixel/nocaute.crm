@@ -40,7 +40,7 @@ export default async function ConfiguracoesPage() {
             title="WhatsApp Meta"
             done={connected}
             doneLabel="WhatsApp Meta etapa realizada"
-            pendingHint="Mesmo número do celular · sem chip novo"
+            pendingHint="1 · Conta Meta  →  2 · WhatsApp do celular"
           >
             <WhatsAppConnectPanel bare connection={store.whatsapp} />
           </StageCard>
@@ -72,7 +72,8 @@ export default async function ConfiguracoesPage() {
                 </>
               ) : (
                 <p className="text-sm text-[#667781]">
-                  No passo 2 conecte o WhatsApp da loja. O cartão das mensagens fica em{" "}
+                  No passo 2: entre na Meta e depois ligue o WhatsApp da loja. O cartão das
+                  mensagens fica em{" "}
                   <Link href="/pagamento-meta" className="font-semibold text-emerald-800 underline-offset-2 hover:underline">
                     Pagamento Meta
                   </Link>

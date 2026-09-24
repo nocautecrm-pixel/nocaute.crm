@@ -153,9 +153,18 @@ export function WhatsAppConnectPanel({
       ) : (
         <FirstStepOnboarding
           connecting={signup.busy}
+          metaBusy={signup.metaBusy}
           connectLabel={signup.connectLabel}
           connectDisabled={signup.connectDisabled}
+          metaDisabled={signup.metaDisabled}
+          metaLinked={signup.metaLinked}
+          metaName={signup.metaName}
+          portfolio={signup.portfolio}
+          recommendedMode={signup.recommendedMode}
           connected={false}
+          onLinkMeta={() => {
+            void signup.linkMeta();
+          }}
           onConnect={(mode) => {
             void signup.connect(mode);
           }}

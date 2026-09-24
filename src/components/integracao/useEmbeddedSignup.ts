@@ -7,8 +7,16 @@ import type { WhatsAppOnboardingMode } from "@/lib/whatsapp/onboarding-mode";
 import { humanizeMetaSignupError, isMetaAppReviewError } from "@/lib/whatsapp/signup-errors";
 import type { WhatsAppConnection } from "@/types/store";
 
+const META_STEP_KEY = "nocaute.metaAccount";
+
+type FbAuthResponse = {
+  code?: string;
+  accessToken?: string;
+};
+
 type FbLoginResponse = {
-  authResponse?: { code?: string };
+  authResponse?: FbAuthResponse;
+  status?: string;
 };
 
 declare global {
@@ -16,6 +24,11 @@ declare global {
     FB?: {
       init: (opts: Record<string, unknown>) => void;
       login: (cb: (response: FbLoginResponse) => void, opts: Record<string, unknown>) => void;
+      api: (
+        path: string,
+        params: Record<string, unknown>,
+        cb: (response: { name?: string; error?: { message?: string } }) => void,
+      ) => void;
     };
     fbAsyncInit?: () => void;
   }
@@ -38,12 +51,45 @@ type SignupResult = {
   label?: string;
 };
 
+export type MetaPortfolioHint = {
+  name: string | null;
+  hasWhatsAppNumber: boolean;
+  limited: boolean;
+  displayPhone: string | null;
+};
+
+type StoredMetaStep = {
+  linked: boolean;
+  name: string | null;
+};
+
 function isMetaMessageOrigin(origin: string) {
   try {
     const host = new URL(origin).hostname;
     return host === "facebook.com" || host.endsWith(".facebook.com");
   } catch {
     return false;
+  }
+}
+
+function readStoredMetaStep(): StoredMetaStep | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(META_STEP_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredMetaStep;
+    if (!parsed?.linked) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredMetaStep(step: StoredMetaStep) {
+  try {
+    window.sessionStorage.setItem(META_STEP_KEY, JSON.stringify(step));
+  } catch {
+    // ignore
   }
 }
 
@@ -55,17 +101,27 @@ export function useEmbeddedSignup(
   const sdkInited = useRef(false);
   const lastMode = useRef<WhatsAppOnboardingMode | null>(null);
   const [busy, setBusy] = useState(false);
+  const [metaBusy, setMetaBusy] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
-  const incomingAccount = useMemo(() => ({
-    connected: connection.connected,
-    displayPhone: connection.displayPhone,
-    verifiedName: connection.verifiedName,
-    wabaId: connection.wabaId,
-    phoneNumberId: connection.phoneNumberId,
-    label: connection.label,
-  }), [connection]);
+  const stored = readStoredMetaStep();
+  const [metaLinked, setMetaLinked] = useState(
+    Boolean(stored?.linked) || connection.connected,
+  );
+  const [metaName, setMetaName] = useState<string | null>(stored?.name ?? null);
+  const [portfolio, setPortfolio] = useState<MetaPortfolioHint | null>(null);
+  const incomingAccount = useMemo(
+    () => ({
+      connected: connection.connected,
+      displayPhone: connection.displayPhone,
+      verifiedName: connection.verifiedName,
+      wabaId: connection.wabaId,
+      phoneNumberId: connection.phoneNumberId,
+      label: connection.label,
+    }),
+    [connection],
+  );
   const [account, setAccount] = useSyncedState(incomingAccount);
 
   const appId = process.env.NEXT_PUBLIC_META_APP_ID?.trim();
@@ -80,7 +136,6 @@ export function useEmbeddedSignup(
       autoLogAppEvents: true,
       xfbml: true,
       version: process.env.NEXT_PUBLIC_META_GRAPH_VERSION ?? "v21.0",
-      // Chrome FedCM abre login consumer (openid) e ignora config_id do Embedded Signup.
       fedCM: false,
     });
     sdkInited.current = true;
@@ -115,7 +170,6 @@ export function useEmbeddedSignup(
           setError(humanizeMetaSignupError(combined, { path: lastMode.current ?? undefined }));
           return;
         }
-        // FINISH e FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING (coexistência) trazem os IDs.
         session.current = {
           wabaId: data.data?.waba_id ?? data.data?.wabaId,
           phoneNumberId: data.data?.phone_number_id ?? data.data?.phoneNumberId,
@@ -159,6 +213,107 @@ export function useEmbeddedSignup(
     onConnected?.();
   }
 
+  async function fetchPortfolio(accessToken: string, fallbackName: string | null) {
+    try {
+      const response = await fetch("/api/meta/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        name?: string | null;
+        hasWhatsAppNumber?: boolean;
+        limited?: boolean;
+        phones?: Array<{ displayPhone?: string | null }>;
+      };
+      if (!response.ok) {
+        setPortfolio({
+          name: fallbackName,
+          hasWhatsAppNumber: false,
+          limited: true,
+          displayPhone: null,
+        });
+        return;
+      }
+      setPortfolio({
+        name: payload.name ?? fallbackName,
+        hasWhatsAppNumber: Boolean(payload.hasWhatsAppNumber),
+        limited: Boolean(payload.limited),
+        displayPhone: payload.phones?.[0]?.displayPhone ?? null,
+      });
+      if (payload.name) setMetaName(payload.name);
+    } catch {
+      setPortfolio({
+        name: fallbackName,
+        hasWhatsAppNumber: false,
+        limited: true,
+        displayPhone: null,
+      });
+    }
+  }
+
+  async function linkMeta() {
+    setMetaBusy(true);
+    setError(null);
+    try {
+      if (!officialLoginReady) {
+        throw new Error("Meta não está configurada neste ambiente.");
+      }
+      if (!window.FB || !sdkReady) {
+        throw new Error("Login da Meta ainda carregando.");
+      }
+
+      let finished = false;
+      const stopBusy = () => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(stuckTimer);
+        setMetaBusy(false);
+      };
+
+      const stuckTimer = window.setTimeout(() => {
+        stopBusy();
+        setError(
+          "O login da Meta não abriu. Permite popups neste site e tenta de novo.",
+        );
+      }, 15000);
+
+      const pending = window.FB.login((response) => {
+        const token = response.authResponse?.accessToken;
+        if (!token) {
+          setError("Entre com o Facebook da loja para continuar.");
+          stopBusy();
+          return;
+        }
+
+        window.FB?.api("/me", { fields: "name" }, (me) => {
+          const name = me?.name ?? null;
+          setMetaLinked(true);
+          setMetaName(name);
+          writeStoredMetaStep({ linked: true, name });
+          void fetchPortfolio(token, name).finally(() => stopBusy());
+        });
+      }, {
+        scope: "public_profile,email,business_management",
+        return_scopes: true,
+        fedCM: false,
+      }) as Promise<unknown> | void;
+
+      if (pending && typeof pending.then === "function") {
+        pending.catch(() => {
+          stopBusy();
+          setError(
+            "O Chrome bloqueou o login da Meta. Permite popups e início de sessão de terceiros.",
+          );
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao entrar na Meta");
+      setMetaBusy(false);
+    }
+  }
+
   async function disconnect() {
     setDisconnecting(true);
     setError(null);
@@ -199,13 +354,11 @@ export function useEmbeddedSignup(
         mode === "existing"
           ? {
               setup: {},
-              // Coexistência: WhatsApp Business do celular (QR). Evita número Cloud + SMS.
               featureType: "whatsapp_business_app_onboarding",
               sessionInfoVersion: "3",
             }
           : {
               setup: {},
-              // Número novo na Cloud API — a Meta pode pedir SMS/voz.
               sessionInfoVersion: "3",
             };
 
@@ -228,7 +381,7 @@ export function useEmbeddedSignup(
       const stuckTimer = window.setTimeout(() => {
         stopBusy();
         setError(
-          "O login da Meta não abriu. À esquerda da barra do Chrome, permite popups e o início de sessão de terceiros neste site. Depois clica de novo.",
+          "A janela da Meta não abriu. Permite popups neste site e tenta de novo.",
         );
       }, 15000);
 
@@ -263,7 +416,7 @@ export function useEmbeddedSignup(
         pending.catch(() => {
           stopBusy();
           setError(
-            "O Chrome bloqueou o login da Meta. Clica no ícone à esquerda do URL, permite início de sessão de terceiros e popups, e tenta de novo.",
+            "O Chrome bloqueou o login da Meta. Permite popups e início de sessão de terceiros.",
           );
         });
       }
@@ -274,31 +427,52 @@ export function useEmbeddedSignup(
   }
 
   const connected = account.connected;
+  const metaDisabled =
+    metaBusy || busy || disconnecting || !officialLoginReady || (officialLoginReady && !sdkReady);
   const connectDisabled =
-    busy || disconnecting || !officialLoginReady || (officialLoginReady && !sdkReady);
-  const disconnectDisabled = busy || disconnecting;
+    busy ||
+    disconnecting ||
+    metaBusy ||
+    (!metaLinked && !connected) ||
+    !officialLoginReady ||
+    (officialLoginReady && !sdkReady);
+  const disconnectDisabled = busy || disconnecting || metaBusy;
   const connectLabel = busy
     ? "Conectando…"
     : !officialLoginReady
       ? "Meta não configurada"
       : officialLoginReady && !sdkReady
         ? "Carregando Meta…"
-        : connected
-          ? "Abrir de novo a Meta"
-          : "Abrir janela da Meta";
+        : !metaLinked
+          ? "Entre na Meta primeiro"
+          : connected
+            ? "Abrir de novo a Meta"
+            : "Conectar WhatsApp da loja";
+
+  const recommendedMode: WhatsAppOnboardingMode =
+    portfolio?.hasWhatsAppNumber === false && portfolio.limited === false
+      ? "new"
+      : "existing";
 
   return {
     account,
     busy,
+    metaBusy,
     disconnecting,
     error,
     appReviewBlocked: isMetaAppReviewError(error),
     connected,
+    metaLinked,
+    metaName,
+    portfolio,
+    recommendedMode,
     connectDisabled,
+    metaDisabled,
     disconnectDisabled,
     connectLabel,
     officialLoginReady,
     initFacebookSdk,
+    linkMeta,
     connect,
     disconnect,
   };
