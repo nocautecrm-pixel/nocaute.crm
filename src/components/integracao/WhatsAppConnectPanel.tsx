@@ -91,8 +91,7 @@ export function WhatsAppConnectPanel({
           </dl>
 
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-            Reconectar: use o mesmo número do WhatsApp Business do celular (QR). Não precisa
-            comprar outro chip.
+            Pode reconectar com o mesmo número do celular.
           </p>
 
           <div className="mt-3 grid grid-cols-1 gap-1.5">
@@ -105,7 +104,7 @@ export function WhatsAppConnectPanel({
                   : "border-slate-200 bg-white text-slate-700"
               }`}
             >
-              Já uso no celular (QR) — recomendado
+              Já uso no celular — ideal
             </button>
             {showNewReconnect ? (
               <button
@@ -117,15 +116,15 @@ export function WhatsAppConnectPanel({
                     : "border-slate-200 bg-white text-slate-700"
                 }`}
               >
-                Número livre / novo na Cloud (SMS)
+                Ainda não tenho WhatsApp
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setShowNewReconnect(true)}
-                className="rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-left text-[11px] font-medium text-slate-500 hover:border-slate-300"
+                className="px-1 text-left text-[11px] font-medium text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline"
               >
-                Número novo na Cloud (avançado)…
+                Não uso WhatsApp no celular ainda?
               </button>
             )}
           </div>
@@ -174,10 +173,10 @@ export function WhatsAppConnectPanel({
           }`}
         >
           {signup.appReviewBlocked ? (
-            <p className="mb-1 font-semibold tracking-tight">Falta App Review no app parceiro</p>
+            <p className="mb-1 font-semibold tracking-tight">Conexão em liberação pela Meta</p>
           ) : null}
           {wrongPath && !signup.appReviewBlocked ? (
-            <p className="mb-1 font-semibold tracking-tight">Caminho SMS em vez de QR</p>
+            <p className="mb-1 font-semibold tracking-tight">Quase lá — tente de novo com QR</p>
           ) : null}
           <p>{signup.error}</p>
         </div>

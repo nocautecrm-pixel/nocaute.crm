@@ -26,7 +26,7 @@ type PhoneNode = {
 };
 
 const UNVERIFIED_PHONE_HINT =
-  "Este número ficou na Meta como Cloud API “por verificar” (SMS). Isso acontece quando se escolhe adicionar número novo em vez de ligar o WhatsApp Business do telemóvel. Não precisa comprar outro chip: na Meta apague este número da WABA e no Nocaute reconecte com “Já uso no celular” (QR) — o mesmo número do app.";
+  "A Meta pediu código em vez de ligar o WhatsApp do celular. No Nocaute escolha de novo “Já uso no celular” e no popup use o QR — mesmo número da loja.";
 
 function graphBase() {
   return `https://graph.facebook.com/${getGraphVersion()}`;

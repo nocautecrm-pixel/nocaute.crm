@@ -13,7 +13,7 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="flex h-full min-h-0 items-stretch justify-center overflow-y-auto lg:items-center lg:overflow-hidden">
-      <div className="grid w-full grid-cols-1 gap-3 lg:h-[min(520px,calc(100%-0.25rem))] lg:grid-cols-3">
+      <div className="grid w-full grid-cols-1 gap-3 lg:h-[min(580px,calc(100%-0.25rem))] lg:grid-cols-3">
         <section className="flex min-h-0 flex-col lg:h-full">
           <StageCard
             step={1}
@@ -40,7 +40,7 @@ export default async function ConfiguracoesPage() {
             title="WhatsApp Meta"
             done={connected}
             doneLabel="WhatsApp Meta etapa realizada"
-            pendingHint="Recomendado: já uso no celular (mesmo número + QR)"
+            pendingHint="Mesmo número do celular · sem chip novo"
           >
             <WhatsAppConnectPanel bare connection={store.whatsapp} />
           </StageCard>
@@ -72,8 +72,7 @@ export default async function ConfiguracoesPage() {
                 </>
               ) : (
                 <p className="text-sm text-[#667781]">
-                  No passo 2 ligue o WhatsApp Business do celular (QR) — mesmo número, sem
-                  comprar chip. O cartão das mensagens fica em{" "}
+                  No passo 2 conecte o WhatsApp da loja. O cartão das mensagens fica em{" "}
                   <Link href="/pagamento-meta" className="font-semibold text-emerald-800 underline-offset-2 hover:underline">
                     Pagamento Meta
                   </Link>

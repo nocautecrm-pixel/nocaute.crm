@@ -1,13 +1,13 @@
 /** Mensagens Meta Embedded Signup → texto claro para o lojista. */
 
 export const META_APP_REVIEW_REQUIRED =
-  "Falta App Review no app parceiro (Nocaute CRM). A Meta bloqueou a integração: o app ainda não tem Advanced Access de whatsapp_business_messaging e whatsapp_business_management. No developers.facebook.com → App Review, pede essas permissões. Sem isso o QR/coexistência não abre para lojas.";
+  "A Meta ainda está liberando a conexão automática para lojas. Em breve você consegue ligar o WhatsApp por aqui. Se precisar agora, fale com o suporte Nocaute.";
 
 export function humanizeMetaSignupError(
   raw: string | null | undefined,
   opts?: { path?: "existing" | "new" },
 ): string {
-  if (!raw?.trim()) return "Erro no login da Meta.";
+  if (!raw?.trim()) return "Não foi possível abrir a Meta. Tente de novo.";
   const text = raw.trim();
   const lower = text.toLowerCase();
 
@@ -19,7 +19,8 @@ export function humanizeMetaSignupError(
     lower.includes("gerenciamento do whatsapp business avançadas") ||
     lower.includes("advanced messaging") ||
     lower.includes("através do processo de análise do app") ||
-    lower.includes("app review")
+    lower.includes("app review") ||
+    lower.includes("advanced access")
   ) {
     return META_APP_REVIEW_REQUIRED;
   }
@@ -32,10 +33,7 @@ export function humanizeMetaSignupError(
     (lower.includes("unverified") && lower.includes("phone"))
   ) {
     return (
-      "A Meta gravou um número Cloud “por verificar” (SMS), não o WhatsApp Business do celular. " +
-      "Isso não é o caminho da loja: na Meta Business apague esse número da WABA e no Nocaute " +
-      "reconecte com “Já uso o WhatsApp Business no celular” (QR). Não precisa comprar outro chip — " +
-      "use o mesmo número do app."
+      "A Meta pediu um código em vez de ligar o WhatsApp do celular. Feche, escolha de novo “Já uso no celular” e no popup ligue com QR — é o mesmo número da loja."
     );
   }
 
@@ -54,23 +52,16 @@ export function humanizeMetaSignupError(
   ) {
     if (opts?.path === "existing") {
       return (
-        "Você escolheu “já uso no celular”, mas a Meta pediu SMS / número com problema. " +
-        "Caminho errado: no popup escolha ligar o WhatsApp Business do celular (QR), " +
-        "não “adicionar número novo”. Não precisa criar nem comprar outro número — " +
-        "é o mesmo do app. Se um Cloud ficou preso na WABA, apague-o e tente de novo."
+        "Parece que a Meta pediu SMS em vez do QR. Feche a janela, abra de novo e escolha ligar o WhatsApp do celular — sem número novo e sem chip extra."
       );
     }
     if (opts?.path === "new") {
       return (
-        "A Meta não verificou este número por SMS. Neste caminho o número tem de estar livre " +
-        "(não pode estar no WhatsApp pessoal/Business). Se a loja já atende no celular, " +
-        "volte e use “Já uso o WhatsApp Business no celular” (QR) — mesmo número, sem chip novo."
+        "Não deu para confirmar esse número. Se a loja já usa WhatsApp no celular, volte e use “Já uso no celular”."
       );
     }
     return (
-      "A Meta pediu SMS / número por verificar. Se a loja já usa WhatsApp Business no celular, " +
-      "escolha “Já uso…” (QR): mesmo número, sem comprar chip. Só use número novo/SMS se o " +
-      "número ainda não estiver em nenhum WhatsApp."
+      "A Meta pediu um código de verificação. Se a loja já usa WhatsApp no celular, use “Já uso no celular” (QR)."
     );
   }
 
@@ -82,6 +73,7 @@ export function isMetaAppReviewError(message: string | null | undefined) {
   return (
     message === META_APP_REVIEW_REQUIRED ||
     message.includes("2655111") ||
+    message.toLowerCase().includes("liberando a conexão") ||
     message.toLowerCase().includes("app review no app parceiro")
   );
 }
@@ -91,10 +83,10 @@ export function isWrongOnboardingPathError(message: string | null | undefined) {
   if (!message) return false;
   const lower = message.toLowerCase();
   return (
+    lower.includes("pediu sms") ||
+    lower.includes("em vez do qr") ||
+    lower.includes("em vez de ligar") ||
     lower.includes("caminho errado") ||
-    lower.includes("por verificar") ||
-    lower.includes("não precisa criar nem comprar") ||
-    lower.includes("nao precisa criar nem comprar") ||
-    (lower.includes("já uso") && lower.includes("sms"))
+    lower.includes("por verificar")
   );
 }
