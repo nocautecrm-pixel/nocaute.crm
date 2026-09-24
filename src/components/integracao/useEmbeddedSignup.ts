@@ -342,7 +342,8 @@ export function useEmbeddedSignup(
 
         void adoptMetaToken(token, false).finally(() => stopBusy());
       }, {
-        scope: "public_profile,email,business_management",
+        // email / business_management rejeitados no App Review → Invalid Scopes.
+        scope: "public_profile",
         return_scopes: true,
         fedCM: false,
       }) as Promise<unknown> | void;
